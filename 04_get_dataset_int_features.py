@@ -24,6 +24,8 @@ PROJECT = 'sad-deep-learning-274812'
 ee.Initialize(project=PROJECT)
 
 
+
+
 '''
 
     Config Session
@@ -42,6 +44,11 @@ ASSET_CLASSIFICATION = 'projects/imazon-simex/LULC/LEGAL_AMAZON/classification'
 
 ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/features-int'
 
+
+
+'''
+    version 1: fetures from all sensors 
+'''
 OUTPUT_VERSION = '1'
 
 
@@ -61,31 +68,6 @@ YEARS = [
 ]
 
 
-
-MODEL_PARAMS = {
-    'numberOfTrees': 50,
-    # 'variablesPerSplit': 4,
-    # 'minLeafPopulation': 25
-}
-
-N_SAMPLES = 1000
-
-
-SAMPLE_PARAMS = pd.DataFrame([
-    #{'label':  3, 'min_samples': N_SAMPLES * 0.20},
-    {'label':  4, 'min_samples': N_SAMPLES * 0.20},
-    {'label': 12, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 15, 'min_samples': N_SAMPLES * 0.20},
-    {'label': 18, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 25, 'min_samples': N_SAMPLES * 0.15},
-    {'label': 33, 'min_samples': N_SAMPLES * 0.15},
-])
-
-SAMPLE_REPLACE_VAL = {
-    'label':{
-        11: 12
-    }
-}
 
 '''
 
@@ -204,6 +186,10 @@ for year in YEARS:
             .addBands(pasture_year)\
             .addBands(agriculture_year)\
             .addBands(water_year)
+        
+        image = image.set('tile', tile)\
+            .set('year', year)\
+            .set('version', OUTPUT_VERSION)
         
 
         name = '{}-{}-{}'.format(int(tile), year, OUTPUT_VERSION)
