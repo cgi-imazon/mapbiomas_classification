@@ -176,13 +176,8 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
         count_samples = samples.query(f'label == {label}').shape[0]
         count_missing_samples = min_samples - count_samples
 
-        if count_missing_samples > 0 and label in (33, 25, 18):
-
+        if count_missing_samples > 0:
             fill_samples_df = list_samples_df.query(f'label == {label}').sample(n= int(0.2 * min_samples))
-
-            print('count samples', count_samples, label)
-            print('min samples', min_samples, label)
-
             samples = pd.concat([samples, fill_samples_df])
 
     return samples
@@ -477,6 +472,8 @@ var classification = image
 Map.addLayer(classification.randomVisualizer())
 
 Map.centerObject(image,12)
+
+https://code.earthengine.google.com/030bcb76dfcc14dfeb8b3880c23cb8cd
 '''
 
 
