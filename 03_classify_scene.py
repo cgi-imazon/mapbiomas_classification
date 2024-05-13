@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath('.'))
 import datetime
 import pandas as pd
 import geopandas as gpd
-import geemap
+import geemap, random
 
 
 from utils.helpers import *
@@ -160,6 +160,9 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
     # total dataset samples
     list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*'))
+
+    # filter 20%
+    list_samples = random.sample(list_samples, int(len(list_samples) * 0.5))
     list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
 
 
@@ -175,7 +178,7 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
         if count_missing_samples > 0 and label in (33, 25, 18):
 
-            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n= 0.5 * min_samples)
+            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n= int(0.2 * min_samples))
 
             print('count samples', count_samples, label)
             print('min samples', min_samples, label)
@@ -345,14 +348,11 @@ for year in YEARS:
 
                 # stratified sampling
                 df_samples_all = get_balanced_samples(balance=SAMPLE_PARAMS, samples=df_samples_all)
+                df_samples_all = df_samples_all[INPUT_FEATURES + ['label', 'geometry']]
 
                 # convert to ee features
                 samples = geemap.geopandas_to_ee(df_samples_all)
                 samples = samples.map(lambda feat: feat.select(INPUT_FEATURES + ['label']))
-
-      
-
-
 
 
                 image = ee.Image(images.filter(f'LANDSAT_SCENE_ID == "{img_id}"').first())
@@ -365,6 +365,11 @@ for year in YEARS:
 
                 # select features
                 image = ee.Image(image).select(INPUT_FEATURES)
+
+
+                # get labels for this image
+                labels_classified = df_samples_all['label'].drop_duplicates().values
+                labels_classified = [str(x) for x in labels_classified]
 
 
 
@@ -400,10 +405,10 @@ for year in YEARS:
 
                 probabilities = probabilities\
                     .arrayProject([0])\
-                    .arrayFlatten([['a', 'b', 'c', 'd', 'e', 'f', 'g']])\
+                    .arrayFlatten([labels_classified])\
                     .reduce(ee.Reducer.max())
 
-                probabilities = ee.Image(probabilities).multiply(100).int8().rename('probabilities')
+                probabilities = ee.Image(probabilities).multiply(100).rename('probabilities')
 
 
 
@@ -435,7 +440,7 @@ for year in YEARS:
                     pyramidingPolicy={".default": "mode"},
                     region=region,
                     scale=30,
-                    # maxPixels=1e+13
+                    maxPixels=1e+13
                 )
 
                 task.start()
