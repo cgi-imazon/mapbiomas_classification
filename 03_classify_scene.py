@@ -186,6 +186,9 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
             elif label == 25:
                 fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=30)
                 samples = pd.concat([samples, fill_samples_df])
+            elif label == 12:
+                fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=50)
+                samples = pd.concat([samples, fill_samples_df])
             else:
                 fill_samples_df = list_samples_df.query(f'label == {label}').sample(n= int(0.2 * min_samples))
                 samples = pd.concat([samples, fill_samples_df])
