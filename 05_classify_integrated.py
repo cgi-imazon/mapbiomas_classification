@@ -38,46 +38,14 @@ ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
-ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/classification'
+ASSET_OUTPUT = ''
+
+ASSET_INTEGRATED = 'projects/imazon-simex/LULC/LEGAL_AMAZON/classification'
 
 OUTPUT_VERSION = '1'
 
 
-LANDSAT_NEW_NAMES = [
-    'blue',
-    'green',
-    'red',
-    'nir',
-    'swir1',
-    'swir2',
-    'pixel_qa',
-    'tir'
-]
 
-
-ASSET_LANDSAT_IMAGES = {
-    'l5c2' : {
-        'idCollection': 'LANDSAT/LT05/C02/T1_L2',
-        'bandNames': ['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'QA_PIXEL', 'ST_B6'],
-        'newBandNames': LANDSAT_NEW_NAMES,
-        'defaultVisParams': {}
-    },
-    'l7c2' : {
-        'idCollection': 'LANDSAT/LE07/C02/T1_L2',
-        'bandNames': ['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'QA_PIXEL', 'ST_B6'],
-        'newBandNames': LANDSAT_NEW_NAMES,
-    },
-    'l8c2' : {
-        'idCollection': 'LANDSAT/LC08/C02/T1_L2',
-        'bandNames': ['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'QA_PIXEL', 'ST_B10'],
-        'newBandNames': LANDSAT_NEW_NAMES,
-    },
-    'l9c2' : {
-        'idCollection': 'LANDSAT/LC09/C02/T1_L2',
-        'bandNames': ['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'QA_PIXEL', 'ST_B10'],
-        'newBandNames': LANDSAT_NEW_NAMES,
-    }
-}
 
 
 
@@ -100,13 +68,7 @@ YEARS = [
 
 
 INPUT_FEATURES = [
-    'gv', 
-    'npv', 
-    'soil', 
-    'cloud',
-    'gvs',
-    'ndfi', 
-    'csfi'
+
 ]
 
 
@@ -156,71 +118,20 @@ tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getI
 '''
     description: if missing features, fill samples from the etire period
 '''
-def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
-    # total dataset samples
-    list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*'))
-
-    # filter 20%
-    list_samples = random.sample(list_samples, int(len(list_samples) * 0.5))
-    list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
-
-
-    
-    # check min samples
-    for id, row in balance.iterrows():
-        label, min_samples = row['label'], row['min_samples']
-
-
-        # get count already filtered
-        count_samples = samples.query(f'label == {label}').shape[0]
-        count_missing_samples = min_samples - count_samples
-
-        if count_missing_samples > 0:
-            if label == 18:
-                fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=80)
-                samples = pd.concat([samples, fill_samples_df])
-            elif label == 33:
-                fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=50)
-                samples = pd.concat([samples, fill_samples_df])
-            elif label == 25:
-                fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=30)
-                samples = pd.concat([samples, fill_samples_df])
-            else:
-                fill_samples_df = list_samples_df.query(f'label == {label}').sample(n= int(0.2 * min_samples))
-                samples = pd.concat([samples, fill_samples_df])
-
-    return samples
-
-
-def get_samples(tile: int, date: str, sr='l8'):
+def get_samples(tile: int):
 
     res = []
     
-
-    tiles_list = tile + 1, tile + 2, tile + 1000, tile + 2000
-
-
-    date_target = datetime.datetime.strptime(date, '%Y-%m-%d')
-    date_t0 = date_target - datetime.timedelta(days=-45)
-    date_t1 = date_target + datetime.timedelta(days=45)
-
-
+    tiles_list = tile + 1, tile + 2, tile + 1000, tile + 2000, tile
 
     for t in tiles_list:
-        
+    
         list_samples = list(glob(f'{PATH_DIR}/data/{year}/{t}/*'))
 
         if len(list_samples) == 0: continue
 
         list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
-
-        list_samples_df = list_samples_df.query(
-            f'DATE_ACQUIRED >= "{date_t0.strftime("%Y-%m-%d")}" or ' + 
-            f'DATE_ACQUIRED <= "{date_t1.strftime("%Y-%m-%d")}"'
-        )
-
-        list_samples_df = list_samples_df.query(f'sensor == "{sr}"')
 
         res.append(list_samples_df)
     
@@ -256,220 +167,55 @@ for year in YEARS:
         center = roi.centroid()
 
 
-        # get landsat images by roi
-        l5 = (
-            ee.ImageCollection(ASSET_LANDSAT_IMAGES['l5c2']['idCollection'])
-            .filterBounds(center)
-            .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
-            .map(lambda image: apply_scale_factors(image))
-            .map(lambda image: image.set('sensor', 'l5'))
-            .select(
-                ASSET_LANDSAT_IMAGES['l5c2']['bandNames'], 
-                ASSET_LANDSAT_IMAGES['l5c2']['newBandNames'])
-            .map(lambda image: remove_cloud(image))
-
+        image = ee.Image(
+            ee.ImageCollection(ASSET_INTEGRATED)
+            .filter(f'version == "1" and year == {year} and tile == {tile}')
+            .first()
         )
 
-        l7 = (
-            ee.ImageCollection(ASSET_LANDSAT_IMAGES['l7c2']['idCollection'])
-            .filterBounds(center)
-            .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
-            .map(lambda image: apply_scale_factors(image))
-            .map(lambda image: image.set('sensor', 'l7'))
-            .select(
-                ASSET_LANDSAT_IMAGES['l7c2']['bandNames'], 
-                ASSET_LANDSAT_IMAGES['l7c2']['newBandNames'])
-            .map(lambda image: remove_cloud(image))
+        name = '{}-{}-{}'.format(int(tile), year, OUTPUT_VERSION)
 
-        )
-
-        l8 = (
-            ee.ImageCollection(ASSET_LANDSAT_IMAGES['l8c2']['idCollection'])
-            .filterBounds(center)
-            .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
-            .map(lambda image: apply_scale_factors(image))
-            .map(lambda image: image.set('sensor', 'l8'))
-            .select(
-                ASSET_LANDSAT_IMAGES['l8c2']['bandNames'], 
-                ASSET_LANDSAT_IMAGES['l8c2']['newBandNames'])
-            .map(lambda image: remove_cloud(image))
-
-        )
-
-        l9 = (
-            ee.ImageCollection(ASSET_LANDSAT_IMAGES['l9c2']['idCollection'])
-            .filterBounds(center)
-            .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
-            .map(lambda image: apply_scale_factors(image))
-            .map(lambda image: image.set('sensor', 'l9'))
-            .select(
-                ASSET_LANDSAT_IMAGES['l9c2']['bandNames'], 
-                ASSET_LANDSAT_IMAGES['l9c2']['newBandNames'])
-            .map(lambda image: remove_cloud(image))
-
-        )
-
-        images = ee.ImageCollection(l5.merge(l7).merge(l8).merge(l9))
-
-        image_list = images.reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
-
-        image_list = list(set(image_list) - set(image_list_loaded))
-
-        for img_id in image_list:
-
-            log = open(PATH_LOGFILE, 'a+')
-
-            imagename = '{}_{}_{}'.format(img_id, str(year),OUTPUT_VERSION)
+        assetId = '{}/{}'.format(ASSET_OUTPUT, name)
             
-            assetId = '{}/{}'.format(ASSET_OUTPUT, imagename)
+        try:
+            assetInfo = ee.data.getAsset(assetId)
+        except Exception as e:  
 
-            try:
-                assetInfo = ee.data.getAsset(assetId)
-            except Exception as e:
-                
-                date_target = f'{str(year)}-08-01'
-                df_target_sample = False
-                sensor = 'l8'
-
-
-                if os.path.isfile(f'{PATH_DIR}/data/{str(year)}/{tile}/{img_id}.geojson'):
-                    df_target_sample = gpd.read_file(f'{PATH_DIR}/data/{str(year)}/{tile}/{img_id}.geojson')
-                    date_target = df_target_sample['DATE_ACQUIRED'].values[0]   
-                    sensor = df_target_sample['sensor'].values[0]  
-
-                
-                samples_surrounded = get_samples(tile, date=date_target, sr=sensor)
-                
-                # if there is no samples, skip
-                if df_target_sample is False and samples_surrounded is None: 
-                    log.write(f'\n{year},{tile},{img_id},fail')
-                    log.close()
-                    continue
+            # get samples
+            samples_df = get_samples(tile=tile)
+            samples_df = samples_df[INPUT_FEATURES + ['label', 'geometry']]
+            samples = geemap.geopandas_to_ee(samples_df)
 
 
-                if samples_surrounded is not None and df_target_sample is False:
-                    df_samples_all = samples_surrounded
-                elif samples_surrounded is None and df_target_sample is not False:
-                    df_samples_all = df_target_sample
-                else: 
-                    df_samples_all = pd.concat([df_target_sample, samples_surrounded])
+            # get labels for this image
+            labels_classified = samples_df['label'].drop_duplicates().values
+            labels_classified = [str(x) for x in labels_classified]
 
 
-                # stratified sampling
-                df_samples_all = get_balanced_samples(balance=SAMPLE_PARAMS, samples=df_samples_all)
-                df_samples_all = df_samples_all[INPUT_FEATURES + ['label', 'geometry']]
-
-                # convert to ee features
-                samples = geemap.geopandas_to_ee(df_samples_all)
-                samples = samples.map(lambda feat: feat.select(INPUT_FEATURES + ['label']))
-
-
-                image = ee.Image(images.filter(f'LANDSAT_SCENE_ID == "{img_id}"').first())
-
-                roi = image.geometry()
-                
-                image = get_fractions(image=image)
-                image = get_ndfi(image=image)
-                image = get_csfi(image=image)
-
-                # select features
-                image = ee.Image(image).select(INPUT_FEATURES)
+            # classify
+            classifier_prob = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
+                .setOutputMode('MULTIPROBABILITY')\
+                .train(samples, 'label', INPUT_FEATURES)
+            
+            classifier = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
+                .train(samples, 'label', INPUT_FEATURES)
 
 
-                # get labels for this image
-                labels_classified = df_samples_all['label'].drop_duplicates().values
-                labels_classified = [str(x) for x in labels_classified]
+            classification = ee.Image(image
+                .classify(classifier)
+                .rename(['classification'])
+                .copyProperties(image)
+                .copyProperties(image, ['system:footprint'])
+                .copyProperties(image, ['system:time_start'])
+            )
 
-
-
-
-                # classify
-                classifier_prob = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
-                    .setOutputMode('MULTIPROBABILITY')\
-                    .train(samples, 'label', INPUT_FEATURES)
-                
-                classifier = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
-                    .train(samples, 'label', INPUT_FEATURES)
-
-
-
-
-
-
-                classification = ee.Image(image
-                    .classify(classifier)
-                    .rename(['classification'])
-                    .copyProperties(image)
-                    .copyProperties(image, ['system:footprint'])
-                    .copyProperties(image, ['system:time_start'])
-                )
-
-                probabilities = ee.Image(image
-                    .classify(classifier_prob)
-                    .rename(['probability'])
-                    .copyProperties(image)
-                    .copyProperties(image, ['system:footprint'])
-                    .copyProperties(image, ['system:time_start'])
-                )
-
-                probabilities = probabilities\
-                    .arrayProject([0])\
-                    .arrayFlatten([labels_classified])\
-                    .reduce(ee.Reducer.max())
-
-                probabilities = ee.Image(probabilities).multiply(100).rename('probabilities')
-
-
-
-
-                classification = classification.toByte()
-                classification = classification.set('version', OUTPUT_VERSION)
-                classification = classification.set('collection_id', 9.0)
-                classification = classification.set('biome', 'AMAZONIA')
-                classification = classification.set('territory', 'AMAZONIA')
-                classification = classification.set('source', 'Imazon')
-                classification = classification.set('year', year)
-
-                probabilities = probabilities.toByte()
-                probabilities = probabilities.set('version', OUTPUT_VERSION)
-                probabilities = probabilities.set('collection_id', 9.0)
-                probabilities = probabilities.set('biome', 'AMAZONIA')
-                probabilities = probabilities.set('territory', 'AMAZONIA')
-                probabilities = probabilities.set('source', 'Imazon')
-                probabilities = probabilities.set('year', year)
-
-                region = roi.getInfo()['coordinates']
-
-                print(f'exporting image: {imagename}')
-
-                task = ee.batch.Export.image.toAsset(
-                    image=classification.addBands(probabilities),
-                    description=imagename,
-                    assetId=assetId,
-                    pyramidingPolicy={".default": "mode"},
-                    region=region,
-                    scale=30,
-                    maxPixels=1e+13
-                )
-
-                task.start()
-
-
-
-
-                log.write(f'\n{year},{tile},{img_id},success')
-                log.close()
-
-
-
-
-    
-
-
-
-
-
-
+            probabilities = ee.Image(image
+                .classify(classifier_prob)
+                .rename(['probability'])
+                .copyProperties(image)
+                .copyProperties(image, ['system:footprint'])
+                .copyProperties(image, ['system:time_start'])
+            )
 
 
 '''

@@ -247,7 +247,7 @@ image_list_loaded = ee.ImageCollection(ASSET_OUTPUT)\
 
 for year in YEARS:
 
-    for tile in tiles_list[:1]:
+    for tile in tiles_list[1:2]:
 
         tile_image = ee.Image(tiles.filter(f'tile == {tile}').first())
 

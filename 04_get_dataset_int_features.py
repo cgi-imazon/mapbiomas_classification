@@ -106,7 +106,8 @@ for year in YEARS:
         center = roi.centroid()
 
         classification_year = ee.ImageCollection(ASSET_CLASSIFICATION)\
-            .filter(f'version == "1" and year == {year}')
+            .filter(f'version == "1" and year == {year}')\
+            .select('classification')
     
 
 
@@ -206,7 +207,8 @@ for year in YEARS:
             pyramidingPolicy={".default": "mode"},
             region=region,
             scale=30,
-            maxPixels=1e+13
+            maxPixels=1e+13,
+            #priority=500
         )
 
         task.start()
