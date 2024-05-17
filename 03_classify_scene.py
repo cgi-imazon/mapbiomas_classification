@@ -34,6 +34,8 @@ PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 
 PATH_LOGFILE = f'{PATH_DIR}/data/log.csv'
 
+PATH_AREAS = 'data/area/areas_la.csv'
+
 ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
@@ -116,7 +118,7 @@ MODEL_PARAMS = {
     # 'minLeafPopulation': 25
 }
 
-N_SAMPLES = 1000
+N_SAMPLES = 3000
 
 
 SAMPLE_PARAMS = pd.DataFrame([
@@ -165,33 +167,22 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
     list_samples = random.sample(list_samples, int(len(list_samples) * 0.5))
     list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
 
+    # balance samples based on stratified area
+    df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
+    df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
+    df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
 
     
     # check min samples
     for id, row in balance.iterrows():
+
         label, min_samples = row['label'], row['min_samples']
 
+        n_samples_fill = df_areas.query(f'cls == {label}').shape[0]
 
-        # get count already filtered
-        count_samples = samples.query(f'label == {label}').shape[0]
-        count_missing_samples = min_samples - count_samples
+        fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=n_samples_fill)
 
-        if count_missing_samples > 0:
-            if label == 18:
-                fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=80)
-                samples = pd.concat([samples, fill_samples_df])
-            elif label == 33:
-                fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=50)
-                samples = pd.concat([samples, fill_samples_df])
-            elif label == 25:
-                fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=30)
-                samples = pd.concat([samples, fill_samples_df])
-            elif label == 12:
-                fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=50)
-                samples = pd.concat([samples, fill_samples_df])
-            else:
-                fill_samples_df = list_samples_df.query(f'label == {label}').sample(n= int(0.2 * min_samples))
-                samples = pd.concat([samples, fill_samples_df])
+        samples = pd.concat([samples, fill_samples_df])
 
     return samples
 
@@ -250,7 +241,7 @@ image_list_loaded = ee.ImageCollection(ASSET_OUTPUT)\
 
 for year in YEARS:
 
-    for tile in tiles_list[1:2]:
+    for tile in tiles_list:
 
         tile_image = ee.Image(tiles.filter(f'tile == {tile}').first())
 
@@ -455,13 +446,13 @@ for year in YEARS:
                     maxPixels=1e+13
                 )
 
-                task.start()
+                #task.start()
 
 
 
 
-                log.write(f'\n{year},{tile},{img_id},success')
-                log.close()
+                #log.write(f'\n{year},{tile},{img_id},success')
+                #log.close()
 
 
 
