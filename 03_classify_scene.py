@@ -122,7 +122,7 @@ N_SAMPLES = 3000
 
 
 SAMPLE_PARAMS = pd.DataFrame([
-    #{'label':  3, 'min_samples': N_SAMPLES * 0.20},
+    {'label':  3, 'min_samples': N_SAMPLES * 0.20},
     {'label':  4, 'min_samples': N_SAMPLES * 0.20},
     {'label': 12, 'min_samples': N_SAMPLES * 0.10},
     {'label': 15, 'min_samples': N_SAMPLES * 0.20},
@@ -180,7 +180,12 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
         n_samples_fill = df_areas.query(f'cls == {label}').shape[0]
 
-        fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=n_samples_fill)
+        
+
+        if label == 33: 
+            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=50)
+        else:
+            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=n_samples_fill)
 
         samples = pd.concat([samples, fill_samples_df])
 
@@ -235,9 +240,50 @@ def save_log():
 
 '''
 
+coords = ee.Geometry.MultiPoint([
+    [
+      -45.84161564370343,
+      -13.18404107200111
+    ],
+    [
+      -44.89679142495343,
+      -13.18404107200111
+    ],
+    [
+      -47.57745548745343,
+      -11.466814921111393
+    ],
+    [
+      -45.95147892495343,
+      -11.617513108005902
+    ],
+    [
+      -44.54601314104589,
+      -11.6539937379325
+    ],
+    [
+      -47.05089595354589,
+      -11.46024930196413
+    ],
+    [
+      -44.72179439104589,
+      -10.65157446115599
+    ],
+    [
+      -46.38072993792089,
+      -10.500378754553292
+    ],
+    [
+      -47.50133540667089,
+      -10.197766401098274
+    ]
+])
+
 image_list_loaded = ee.ImageCollection(ASSET_OUTPUT)\
     .filter('version == "1"')\
     .reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
+    #.filterBounds(coords)\
+    
 
 for year in YEARS:
 
@@ -352,6 +398,7 @@ for year in YEARS:
                 # stratified sampling
                 df_samples_all = get_balanced_samples(balance=SAMPLE_PARAMS, samples=df_samples_all)
                 df_samples_all = df_samples_all[INPUT_FEATURES + ['label', 'geometry']]
+                df_samples_all = df_samples_all.replace(SAMPLE_REPLACE_VAL)
 
                 # convert to ee features
                 samples = geemap.geopandas_to_ee(df_samples_all)
@@ -446,13 +493,13 @@ for year in YEARS:
                     maxPixels=1e+13
                 )
 
-                #task.start()
+                task.start()
 
 
 
 
-                #log.write(f'\n{year},{tile},{img_id},success')
-                #log.close()
+                log.write(f'\n{year},{tile},{img_id},success')
+                log.close()
 
 
 
