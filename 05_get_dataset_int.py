@@ -54,8 +54,8 @@ ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/features-int'
 OUTPUT_VERSION = '1'
 
 # this must be your partition raw fc samples
-ASSET_SAMPLES = 'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_col3_points_w_edge_and_edited_v2_train_LA'
-
+#ASSET_SAMPLES = 'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_col3_points_w_edge_and_edited_v2_train_LA'
+ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col3_points_w_edge_and_edited_v3'
 
 YEARS = [
     # 1985
@@ -72,8 +72,6 @@ YEARS = [
     2023
 ]
 
-
-INPUT_FEATURES = []
 
 
 '''
@@ -122,7 +120,11 @@ roi = ee.FeatureCollection(ASSET_ROI)
 
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
-tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+#tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+
+tiles_list = [
+    220062
+]
 
 samples = ee.FeatureCollection(ASSET_SAMPLES).filterBounds(roi.geometry())
 
@@ -145,22 +147,23 @@ def get_dataset(tile_id: str):
     # check if dir exists
     if not os.path.exists(f'{PATH_DIR}/data/{str(year)}/{tile_id}'):
         os.makedirs(f'{PATH_DIR}/data/{str(year)}/{tile_id}')
-    else: return None
+    #else: return None
 
     # check if file already exists
     if os.path.isfile(f'{PATH_DIR}/data/{str(year)}/{tile_id}_{OUTPUT_VERSION}_integrated.geojson'):
-        print(1)
+        print(f'{PATH_DIR}/data/{str(year)}/{tile_id}_{OUTPUT_VERSION}_integrated.geojson', 1)
         return None
     
 
     # get asset feature
     asset_feat_tile = '{}/{}-{}-{}'.format(ASSET_FEATURES, str(tile_id), str(year), OUTPUT_VERSION)
 
-
+    print(asset_feat_tile)
 
     tile_image = ee.Image(tiles.filter(f'tile == {tile_id}').first())
 
     roi = tile_image.geometry()
+
 
 
     samples_harmonized_tile = samples_harmonized.filterBounds(roi)
@@ -174,6 +177,8 @@ def get_dataset(tile_id: str):
         scale = 30, 
         geometries = True
     )
+
+    
 
     # set properties
     samples_image = samples_image.map(lambda feat: feat.copyProperties(image))
@@ -198,8 +203,7 @@ def export_dataset(tiles: list, year:int):
     for future in concurrent.futures.as_completed(future_to_point):
         point = future_to_point[future]
 
-        samples_image_gdf, tile_id = future.result()
-
+        samples_image_gdf = future.result()
 
         if samples_image_gdf is None: 
             print('error - gdf is none')
@@ -209,7 +213,7 @@ def export_dataset(tiles: list, year:int):
         try:
             # export geodataframe
             samples_image_gdf[0].to_file(
-                f'{PATH_DIR}/data/{str(year)}/{tile_id}_{OUTPUT_VERSION}_integrated.geojson', driver='GeoJSON'
+                f'{PATH_DIR}/data/{str(year)}/{samples_image_gdf[1]}_{OUTPUT_VERSION}_integrated.geojson', driver='GeoJSON'
             ) 
 
         except Exception as e:
@@ -225,6 +229,7 @@ def export_dataset(tiles: list, year:int):
 
 for year in YEARS:
 
+
     # harmonization classes for dataset samples
     year_sample = 'CLASS_' + str(year) if year <= 2022 else 'CLASS_2022'
   
@@ -234,6 +239,6 @@ for year in YEARS:
         year_sample
     ).select([year_sample], ['label'])
 
-    export_dataset(tiles_list[:1], year)
+    export_dataset(tiles_list, year)
 
 
