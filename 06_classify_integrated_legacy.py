@@ -68,7 +68,16 @@ YEARS = [
 
 
 INPUT_FEATURES = [
-
+    'mode',
+    'transitions_year',
+    'distinct_year',
+    'observations_year',
+    'occurrence_forest_year',
+    'occurrence_savanna_year',
+    'occurrence_grassland_year',
+    'occurrence_pasture_year',
+    'occurrence_agriculture_year',
+    'occurrence_water_year'
 ]
 
 
