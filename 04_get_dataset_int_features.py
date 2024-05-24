@@ -109,7 +109,9 @@ for year in YEARS:
             .filter(f'version == "1" and year == {year}')\
             .select('classification')
     
-
+        probability_year = ee.ImageCollection(ASSET_CLASSIFICATION)\
+            .filter(f'version == "1" and year == {year}')\
+            .select('probabilities')
 
     
         # get metrics
@@ -136,45 +138,65 @@ for year in YEARS:
             .reduce(ee.Reducer.mode())\
             .rename('mode')
 
-        #
         # occurrence in the year
-        #
         forest_year = classification_year\
             .map(lambda image: image.eq(3))\
             .reduce(ee.Reducer.sum())\
             .divide(n_observations_year)\
             .rename('occurrence_forest_year')
 
+        # occurrence savanna 
         savanna_year = classification_year\
             .map(lambda image: image.eq(4))\
             .reduce(ee.Reducer.sum())\
             .divide(n_observations_year)\
             .rename('occurrence_savanna_year')
-
+        
+        # occurrence grass 
         grassland_year = classification_year\
             .map(lambda image: image.eq(12))\
             .reduce(ee.Reducer.sum())\
             .divide(n_observations_year)\
             .rename('occurrence_grassland_year')
 
+        # occurrence pasture
         pasture_year = classification_year\
             .map(lambda image: image.eq(15))\
             .reduce(ee.Reducer.sum())\
             .divide(n_observations_year)\
             .rename('occurrence_pasture_year')
 
+        # occurrence agriculture
         agriculture_year = classification_year\
             .map(lambda image: image.eq(18))\
             .reduce(ee.Reducer.sum())\
             .divide(n_observations_year)\
             .rename('occurrence_agriculture_year')
 
+        # occurrence water year
         water_year = classification_year\
             .map(lambda image: image.eq(33))\
             .reduce(ee.Reducer.sum())\
             .divide(n_observations_year)\
             .rename('occurrence_water_year')
+        
+        # min probability
+        probability_min = probability_year\
+            .reduce(ee.Reducer.min())\
+            .divide(n_observations_year)\
+            .rename('probability_min')
 
+        # max probability
+        probability_max = probability_year\
+            .reduce(ee.Reducer.max())\
+            .divide(n_observations_year)\
+            .rename('probability_max')
+        
+        # median probability
+        probability_median = probability_year\
+            .reduce(ee.Reducer.max())\
+            .divide(n_observations_year)\
+            .rename('probability_median')
 
         # image feature space
         image = mode_year\
@@ -186,7 +208,10 @@ for year in YEARS:
             .addBands(grassland_year)\
             .addBands(pasture_year)\
             .addBands(agriculture_year)\
-            .addBands(water_year)
+            .addBands(water_year)\
+            .addBands(probability_max)\
+            .addBands(probability_min)\
+            .addBands(probability_median)
         
         image = image.set('tile', tile)\
             .set('year', year)\
