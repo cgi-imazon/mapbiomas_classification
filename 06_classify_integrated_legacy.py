@@ -164,18 +164,15 @@ for year in YEARS:
 
     for tile in tiles:
 
-
-
         samples = ee.FeatureCollection(get_samples(tile=tile, dataset_samples=dataset_samples))\
             .remap(REMAP_FROM, REMAP_TO, 'class')
 
         samples_balanced = get_balanced_samples(SAMPLE_PARAMS, samples, tile)
 
         classes = samples_balanced.reduceColumns(ee.Reducer.frequencyHistogram(), ['class']).get('histogram').getInfo()
-        classes = [int(x) for x in list(dict(classes).keys())]
-        print(classes)
+        classes_str = [str(x) for x in list(dict(classes).keys())]
+        classes_int = [int(x) for x in list(dict(classes).keys())]
 
-        exit()
 
 
         # classify
@@ -213,7 +210,7 @@ for year in YEARS:
 
         probabilities = probabilities\
             .arrayProject([0])\
-            .arrayFlatten([labels_classified])\
+            .arrayFlatten([classes_str])\
             .reduce(ee.Reducer.max())
 
         probabilities = ee.Image(probabilities).multiply(100).rename('probabilities')
