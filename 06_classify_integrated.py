@@ -142,7 +142,7 @@ def get_samples(tile: int):
 
     for t in tiles_list:
     
-        list_samples = list(glob(f'{PATH_DIR}/data/{year}/*int.geojson'))
+        list_samples = list(glob(f'{PATH_DIR}/data/{year}/*_integrated.geojson'))
 
         print(list_samples)
 
@@ -166,7 +166,7 @@ def get_samples(tile: int):
 def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
     # total dataset samples
-    list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*int.geojson'))
+    list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*_integrated.geojson'))
 
     # filter 20%
     list_samples = random.sample(list_samples, int(len(list_samples) * 0.5))

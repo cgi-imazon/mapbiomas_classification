@@ -213,7 +213,7 @@ def export_dataset(tiles: list, year:int):
         try:
             # export geodataframe
             samples_image_gdf[0].to_file(
-                f'{PATH_DIR}/data/{str(year)}/{samples_image_gdf[1]}_{OUTPUT_VERSION}_integrated.geojson', driver='GeoJSON'
+                f'{PATH_DIR}/data/{str(year)}/{samples_image_gdf[1]}/{samples_image_gdf[1]}_{OUTPUT_VERSION}_integrated.geojson', driver='GeoJSON'
             ) 
 
         except Exception as e:
