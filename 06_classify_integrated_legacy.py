@@ -36,7 +36,7 @@ ASSET_DATASET_INT_C6 = 'projects/imazon-simex/LULC/SAMPLES/COLLECTION6/INTEGRATE
 ASSET_FEATURE_SPACE_C9 = 'projects/imazon-simex/LULC/COLLECTION9/feature-space'
 ASSET_FEATURE_SPACE_C7 = 'projects/imazon-simex/LULC/COLLECTION7/feature-space'
 
-PATH_AREAS = 'data/area/areas_la.csv'
+PATH_AREAS = 'data/area/areas_amazon.csv'
 
 INPUT_VERSION_DATASET_COL = '6'
 INPUT_VERSION_DATASET = '2'
@@ -112,23 +112,32 @@ def get_samples(tile, dataset_samples):
 
 def get_balanced_samples(balance: pd.DataFrame, samples: ee.featurecollection.FeatureCollection, tile):
 
+    year_ = 2022 if year == 2023 else 2022
+
     tile = int(tile)
     samples_balanced = ee.FeatureCollection([])
 
     # balance samples based on stratified area
-    df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
+    df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year_} and tile == {tile}')
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
+
+    
     
     # check min samples
     for id, row in balance.iterrows():
 
         label, min_samples = row['label'], row['min_samples']
 
-        n_samples_fill = df_areas.query(f'cls == {label}').shape[0]
+        n_samples_fill = df_areas.loc[df_areas['class'] == int(label)].shape[0]
 
-        samples_balanced = samples_balanced.merge(samples.filter(
-            ee.Filter.eq('class', label)).limit(min_samples))
+        if n_samples_fill < min_samples:
+            samples_balanced = samples_balanced.merge(samples.filter(
+                ee.Filter.eq('class', label)).limit(n_samples_fill))
+        else:
+            samples_balanced = samples_balanced.merge(samples.filter(
+                ee.Filter.eq('class', label)).limit(min_samples))
+            
 
     return samples_balanced
 
@@ -173,7 +182,9 @@ for year in YEARS:
         classes_str = [str(x) for x in list(dict(classes).keys())]
         classes_int = [int(x) for x in list(dict(classes).keys())]
 
+        print(classes_str)
 
+        exit()
 
         # classify
         classifier_prob = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\

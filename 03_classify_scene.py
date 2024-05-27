@@ -172,6 +172,7 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
 
+
     
     # check min samples
     for id, row in balance.iterrows():
@@ -180,14 +181,18 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
         n_samples_fill = df_areas.query(f'cls == {label}').shape[0]
 
-        
+        fill_samples_agri_df = list_samples_df.query(f'label == 18').sample(n=60)
 
         if label == 33: 
             fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=50)
         else:
             fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=n_samples_fill)
 
-        samples = pd.concat([samples, fill_samples_df])
+
+        if label == 18: 
+            samples = pd.concat([samples, fill_samples_df, fill_samples_agri_df])
+        else:
+            samples = pd.concat([samples, fill_samples_df])
 
     return samples
 
