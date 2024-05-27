@@ -214,3 +214,23 @@ for year in YEARS:
             .reduce(ee.Reducer.max())
 
         probabilities = ee.Image(probabilities).multiply(100).rename('probabilities')
+
+
+
+
+        classification = classification.toByte()
+        classification = classification.set('version', OUTPUT_VERSION)
+        classification = classification.set('collection_id', 9.0)
+        classification = classification.set('biome', 'AMAZONIA')
+        classification = classification.set('territory', 'AMAZONIA')
+        classification = classification.set('source', 'Imazon')
+        classification = classification.set('year', year)
+
+        probabilities = probabilities.toByte()
+        probabilities = probabilities.set('version', OUTPUT_VERSION)
+        probabilities = probabilities.set('collection_id', 9.0)
+        probabilities = probabilities.set('biome', 'AMAZONIA')
+        probabilities = probabilities.set('territory', 'AMAZONIA')
+        probabilities = probabilities.set('source', 'Imazon')
+        probabilities = probabilities.set('year', year)
+

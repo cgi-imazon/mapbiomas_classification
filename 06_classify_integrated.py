@@ -34,6 +34,8 @@ PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 
 PATH_LOGFILE = f'{PATH_DIR}/data/log.csv'
 
+PATH_AREAS = 'data/area/areas_la.csv'
+
 ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
@@ -125,6 +127,7 @@ tiles_list = [
 
 '''
 
+
 '''
     description: if missing features, fill samples from the etire period
 '''
@@ -139,7 +142,7 @@ def get_samples(tile: int):
 
     for t in tiles_list:
     
-        list_samples = list(glob(f'{PATH_DIR}/data/{year}/*.geojson'))
+        list_samples = list(glob(f'{PATH_DIR}/data/{year}/*int.geojson'))
 
         print(list_samples)
 
@@ -156,6 +159,42 @@ def get_samples(tile: int):
 
     return df
 
+
+'''
+    description: if missing features, fill samples from the etire period
+'''
+def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
+
+    # total dataset samples
+    list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*int.geojson'))
+
+    # filter 20%
+    list_samples = random.sample(list_samples, int(len(list_samples) * 0.5))
+    list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
+
+    # balance samples based on stratified area
+    df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
+    df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
+    df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
+
+    
+    # check min samples
+    for id, row in balance.iterrows():
+
+        label, min_samples = row['label'], row['min_samples']
+
+        n_samples_fill = df_areas.query(f'cls == {label}').shape[0]
+
+        
+
+        if label == 33: 
+            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=50)
+        else:
+            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=n_samples_fill)
+
+        samples = pd.concat([samples, fill_samples_df])
+
+    return samples
 
 def save_log():
     pass
@@ -192,8 +231,14 @@ for year in YEARS:
 
             # get samples
             samples_df = get_samples(tile=tile)
-            samples_df = samples_df[INPUT_FEATURES + ['label', 'geometry']]
-            samples = geemap.geopandas_to_ee(samples_df)
+
+
+            # stratified sampling
+            df_samples_all = get_balanced_samples(balance=SAMPLE_PARAMS, samples=samples_df)
+            df_samples_all = df_samples_all[INPUT_FEATURES + ['label', 'geometry']]
+            df_samples_all = df_samples_all.replace(SAMPLE_REPLACE_VAL)
+      
+            samples = geemap.geopandas_to_ee(df_samples_all)
 
 
             # get labels for this image
