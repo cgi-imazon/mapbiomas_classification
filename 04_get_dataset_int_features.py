@@ -194,9 +194,18 @@ for year in YEARS:
         
         # median probability
         probability_median = probability_year\
-            .reduce(ee.Reducer.max())\
+            .reduce(ee.Reducer.median())\
             .divide(n_observations_year)\
             .rename('probability_median')
+
+
+        # median std deviation
+        probability_std_dev = probability_year\
+            .reduce(ee.Reducer.stdDev())\
+            .divide(n_observations_year)\
+            .rename('probability_std_dev')
+
+
 
         # image feature space
         image = mode_year\
@@ -211,7 +220,8 @@ for year in YEARS:
             .addBands(water_year)\
             .addBands(probability_max)\
             .addBands(probability_min)\
-            .addBands(probability_median)
+            .addBands(probability_median)\
+            .addBands(probability_std_dev)
         
         image = image.set('tile', tile)\
             .set('year', year)\

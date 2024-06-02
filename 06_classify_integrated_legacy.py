@@ -160,11 +160,11 @@ for year in YEARS:
         .get('list').getInfo()
     
     
-    year = 2020 if year > 2020 else year
+    year_ = 2020 if year > 2020 else year
 
     # asset
     asset_dataset = '{}/samples-amazon-collection-{}-{}-{}'\
-        .format(ASSET_DATASET_INT_C6, INPUT_VERSION_DATASET_COL, str(year), INPUT_VERSION_DATASET)
+        .format(ASSET_DATASET_INT_C6, INPUT_VERSION_DATASET_COL, str(year_), INPUT_VERSION_DATASET)
 
     # dataset 
     dataset_samples = ee.FeatureCollection(asset_dataset)
@@ -182,10 +182,6 @@ for year in YEARS:
         classes_str = [str(x) for x in list(dict(classes).keys())]
         classes_int = [int(x) for x in list(dict(classes).keys())]
 
-        print(classes_str)
-
-        exit()
-
         # classify
         classifier_prob = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
             .setOutputMode('MULTIPROBABILITY')\
@@ -197,6 +193,8 @@ for year in YEARS:
 
         # image feature space
         image = ee.Image('{}/{}-{}-{}'.format(ASSET_FEATURE_SPACE_C9, int(tile), year, INPUT_VERSION_DATASET))
+
+        print('{}/{}-{}-{}'.format(ASSET_FEATURE_SPACE_C9, int(tile), year, INPUT_VERSION_DATASET))
 
         image = image.select(FEATURE_SPACE)
 
@@ -244,4 +242,9 @@ for year in YEARS:
         probabilities = probabilities.set('territory', 'AMAZONIA')
         probabilities = probabilities.set('source', 'Imazon')
         probabilities = probabilities.set('year', year)
+
+
+        name = '{}-{}-{}'.format(int(tile), year, OUTPUT_VERSION)
+
+        print(f'exporting integration {name}')
 
