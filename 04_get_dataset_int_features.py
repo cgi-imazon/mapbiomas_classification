@@ -97,7 +97,7 @@ tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getI
 
 for year in YEARS:
 
-    for tile in tiles_list[:1]:
+    for tile in tiles_list[50:]:
 
         tile_image = ee.Image(tiles.filter(f'tile == {tile}').first())
 

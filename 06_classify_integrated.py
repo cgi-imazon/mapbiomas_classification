@@ -77,7 +77,11 @@ INPUT_FEATURES = [
     'occurrence_grassland_year',
     'occurrence_pasture_year',
     'occurrence_agriculture_year',
-    'occurrence_water_year'
+    'occurrence_water_year',
+    'probability_min',
+    'probability_max',
+    'probability_median',
+    'probability_std_dev'
 ]
 
 
@@ -116,10 +120,9 @@ roi = ee.FeatureCollection(ASSET_ROI)
 
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
-#tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
-tiles_list = [
-    220062
-]
+tiles_list = ee.ImageCollection(ASSET_FEATURES).reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+
+print(tiles_list[:1])
 
 '''
     
@@ -138,21 +141,19 @@ def get_samples(tile: int):
     
     tiles_list = tile + 1, tile + 2, tile + 1000, tile + 2000, tile
 
-    
-
     for t in tiles_list:
     
         list_samples = list(glob(f'{PATH_DIR}/data/{year}/*_integrated.geojson'))
 
-        print(list_samples)
-
         if len(list_samples) == 0: continue
+
 
         list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
 
         res.append(list_samples_df)
     
-    if len(res) == 0: return None
+    if len(res) == 0: 
+        return None
 
     df = pd.concat(res) 
     #df = df.sample(frac=0.8)
@@ -166,7 +167,7 @@ def get_samples(tile: int):
 def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
     # total dataset samples
-    list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*_integrated.geojson'))
+    list_samples = list(glob(f'{PATH_DIR}/data/{year}/*_integrated.geojson'))
 
     # filter 20%
     list_samples = random.sample(list_samples, int(len(list_samples) * 0.5))
@@ -185,10 +186,9 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
         n_samples_fill = df_areas.query(f'cls == {label}').shape[0]
 
-        
-
         if label == 33: 
-            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=50)
+            count_sp = 50 if n_samples_fill > 50 else n_samples_fill
+            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=count_sp)
         else:
             fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=n_samples_fill)
 
@@ -242,7 +242,7 @@ for year in YEARS:
 
 
             # get labels for this image
-            labels_classified = samples_df['label'].drop_duplicates().values
+            labels_classified = df_samples_all['label'].drop_duplicates().values
             labels_classified = [str(x) for x in labels_classified]
 
 

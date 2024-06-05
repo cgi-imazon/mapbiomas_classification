@@ -120,11 +120,8 @@ roi = ee.FeatureCollection(ASSET_ROI)
 
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
-#tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 
-tiles_list = [
-    220062
-]
 
 samples = ee.FeatureCollection(ASSET_SAMPLES).filterBounds(roi.geometry())
 
@@ -145,8 +142,8 @@ print('samples ' + str(samples.size().getInfo()))
 def get_dataset(tile_id: str):
 
     # check if dir exists
-    if not os.path.exists(f'{PATH_DIR}/data/{str(year)}/{tile_id}'):
-        os.makedirs(f'{PATH_DIR}/data/{str(year)}/{tile_id}')
+    #if not os.path.exists(f'{PATH_DIR}/data/{str(year)}/{tile_id}'):
+    #    os.makedirs(f'{PATH_DIR}/data/{str(year)}/{tile_id}')
     #else: return None
 
     # check if file already exists
@@ -159,6 +156,7 @@ def get_dataset(tile_id: str):
     asset_feat_tile = '{}/{}-{}-{}'.format(ASSET_FEATURES, str(tile_id), str(year), OUTPUT_VERSION)
 
     print(asset_feat_tile)
+    print(tile_id)
 
     tile_image = ee.Image(tiles.filter(f'tile == {tile_id}').first())
 
@@ -205,6 +203,8 @@ def export_dataset(tiles: list, year:int):
 
         samples_image_gdf = future.result()
 
+        print(samples_image_gdf[1])
+
         if samples_image_gdf is None: 
             print('error - gdf is none')
             continue
@@ -213,7 +213,8 @@ def export_dataset(tiles: list, year:int):
         try:
             # export geodataframe
             samples_image_gdf[0].to_file(
-                f'{PATH_DIR}/data/{str(year)}/{samples_image_gdf[1]}/{samples_image_gdf[1]}_{OUTPUT_VERSION}_integrated.geojson', driver='GeoJSON'
+                f'{PATH_DIR}/data/{str(year)}/{samples_image_gdf[1]}_{OUTPUT_VERSION}_integrated.geojson',
+                driver='GeoJSON'
             ) 
 
         except Exception as e:
