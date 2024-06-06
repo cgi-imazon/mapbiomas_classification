@@ -16,75 +16,45 @@ var image = ee.ImageCollection(asset).select('classification').mosaic()
 
 
 
-function spatialFilterArea(image) {
-
-  var objectId15 = image.eq(15).selfMask().connectedComponents({
-    connectedness: ee.Kernel.plus(2),
-    maxSize: 256
-  });
-  
-  var objectId18 = image.eq(18).selfMask().connectedComponents({
-    connectedness: ee.Kernel.plus(2),
-    maxSize: 256
-  });
-  
-  
-  
-  
-  var objectSize15 = objectId15.select('labels').connectedPixelCount({
-    maxSize: 256, eightConnected: false
-  });
-  
-  var objectSize18 = objectId18.select('labels').connectedPixelCount({
-    maxSize: 256, eightConnected: false
-  });
-  
-  
-  
+function spatialFilterArea(image, classe) {
   
   var pixelArea = ee.Image.pixelArea().divide(10000);
+
+  var objectId = image.eq(classe).selfMask().connectedComponents({
+    connectedness: ee.Kernel.plus(2),
+    maxSize: 256
+  });
   
   
-  
-  var objectArea15 = objectSize15.multiply(pixelArea);
-  var objectArea18 = objectSize18.multiply(pixelArea);
-  
-  
-  objectArea15 = objectArea15.lte(6).unmask(0);
-  objectArea18 = objectArea18.lte(6).unmask(0);
+  var objectSize = objectId.select('labels').connectedPixelCount({
+    maxSize: 256, eightConnected: false
+  });
   
   
-  
+  var objectArea = objectSize.multiply(pixelArea);
+      objectArea = objectArea.lte(3).unmask(0);
+
   
   var kernel = ee.Kernel.plus({radius: 1});
   
-  
-  
-  
-  var buffer15 = image.mask(objectArea15.eq(0))
+  var buffer = image.mask(objectArea.eq(0))
                .focalMax({kernel: kernel, iterations: 1})
                .reproject({scale:30, crs:'epsg:4326'})
-               .mask(objectArea15.eq(1));
+               .mask(objectArea.eq(1));
       
-  var buffer18 = image.mask(objectArea18.eq(0))
-               .focalMax({kernel: kernel, iterations: 1})
-               .reproject({scale:30, crs:'epsg:4326'})
-               .mask(objectArea15.eq(1));
 
-  objectId15 = objectId15.mask(objectArea15.eq(1)).addBands(buffer15, null, true);
-  
-  
+  objectId = objectId.mask(objectArea.eq(1)).addBands(buffer, null, true);
+
   
   
   // replace noisy by mode of border
-  var replacement = objectId15.reduceConnectedComponents({
+  var replacement = objectId.reduceConnectedComponents({
     reducer:ee.Reducer.mode(), labelBand:'labels', maxSize:256
   });
   
-  
-  
-  
-  return [objectArea15, replacement]
+  var imageFiltered = image.where(objectArea.eq(1), replacement);
+
+  return imageFiltered
   
 
 }
@@ -103,9 +73,11 @@ function majorityFilter(image) {
 }
 
 
-var imageFiltered = majorityFilter(image)
 
-var around = spatialFilterArea(imageFiltered);
+
+var imageFiltered = majorityFilter(image)
+    imageFiltered = spatialFilterArea(imageFiltered, 15);
+    imageFiltered = spatialFilterArea(imageFiltered, 18);
 
 var visMb = {
   palette:palettesMb,
@@ -119,6 +91,6 @@ Map.addLayer(image, visMb, 'c9', true);
 Map.addLayer(imageFiltered, visMb, 'c9 filtered', false);
 
 
-Map.addLayer(around[0].selfMask(), {min:0, max:1, palette:['black','white']}, 'target')
-Map.addLayer(around[1], visMb, 'around')
+//Map.addLayer(around[0].selfMask(), {min:0, max:1, palette:['black','white']}, 'target')
+Map.addLayer(imageFiltered, visMb, 'filtered')
 
