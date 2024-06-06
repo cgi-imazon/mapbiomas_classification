@@ -44,8 +44,8 @@ ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/integrated'
 
 ASSET_FEATURES = 'projects/imazon-simex/LULC/LEGAL_AMAZON/features-int'
 
-OUTPUT_VERSION = '1'
-
+FS_VERSION = '1'
+OUTPUT_VERSION = '2'
 
 
 
@@ -78,10 +78,10 @@ INPUT_FEATURES = [
     'occurrence_pasture_year',
     'occurrence_agriculture_year',
     'occurrence_water_year',
-    'probability_min',
-    'probability_max',
-    'probability_median',
-    'probability_std_dev'
+    #'probability_min',
+    #'probability_max',
+    #'probability_median',
+    #'probability_std_dev'
 ]
 
 
@@ -224,7 +224,7 @@ for year in YEARS:
             assetInfo = ee.data.getAsset(assetId)
         except Exception as e: 
 
-            asset_feat_tile = '{}/{}-{}-{}'.format(ASSET_FEATURES, str(tile), str(year), OUTPUT_VERSION)
+            asset_feat_tile = '{}/{}-{}-{}'.format(ASSET_FEATURES, str(tile), str(year), FS_VERSION)
 
             # get image
             image = ee.Image(asset_feat_tile) 
