@@ -6,7 +6,7 @@ var palettesMb = require('users/mapbiomas/modules:Palettes.js').get('classificat
 // config
 var assetRoi = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 var asset = 'projects/imazon-simex/LULC/LEGAL_AMAZON/integrated'
-var assetOutput = 'projects/imazon-simex/LULC/LEGAL_AMAZON/integrated'
+var assetOutput = 'projects/imazon-simex/LULC/LEGAL_AMAZON/integrated-filters'
 
 var version = "1";
 
