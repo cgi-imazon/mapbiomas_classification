@@ -94,8 +94,9 @@ YEARS = [
     # 2005, 2006, 2007, 2008,
     # 2009, 2010, 2011, 2012, 2013, 2014,
     # 2015, 2016, 2017, 2018, 2019, 2020,
-    # 2021, 2022, 
-    2023
+    # 2021, 
+    2022, 
+    # 2023
 ]
 
 
@@ -180,6 +181,8 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
         label, min_samples = row['label'], row['min_samples']
 
         n_samples_fill = df_areas.query(f'cls == {label}').shape[0]
+
+        print(n_samples_fill)
 
         fill_samples_agri_df = list_samples_df.query(f'label == 18').sample(n=60)
 
@@ -498,13 +501,13 @@ for year in YEARS:
                     maxPixels=1e+13
                 )
 
-                task.start()
+                # task.start()
 
 
 
 
-                log.write(f'\n{year},{tile},{img_id},success')
-                log.close()
+                #log.write(f'\n{year},{tile},{img_id},success')
+                #log.close()
 
 
 

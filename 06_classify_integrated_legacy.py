@@ -31,35 +31,38 @@ ee.Initialize(project=PROJECT)
 
 '''
 
+ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
+
 ASSET_DATASET_INT_C6 = 'projects/imazon-simex/LULC/SAMPLES/COLLECTION6/INTEGRATE'
 
 ASSET_FEATURE_SPACE_C9 = 'projects/imazon-simex/LULC/COLLECTION9/feature-space'
 ASSET_FEATURE_SPACE_C7 = 'projects/imazon-simex/LULC/COLLECTION7/feature-space'
+ASSET_OUTPUT = 'projects/imazon-simex/LULC/COLLECTION9/probability'
 
 PATH_AREAS = 'data/area/areas_amazon.csv'
 
 INPUT_VERSION_DATASET_COL = '6'
 INPUT_VERSION_DATASET = '2'
-OUTPUT_VERSION = '1'
+OUTPUT_VERSION = '2'
 
 FEATURE_SPACE = [
     'mode',
     'mode_secondary',
-    'transitions_total',
+    #'transitions_total',
     'transitions_year',
-    'distinct_total',
+    #'distinct_total',
     'distinct_year',
-    'occurrence_agriculture_total',
+    #'occurrence_agriculture_total',
     'occurrence_agriculture_year',
-    'occurrence_forest_total',
+    #'occurrence_forest_total',
     'occurrence_forest_year',
-    'occurrence_grassland_total',
+    #'occurrence_grassland_total',
     'occurrence_grassland_year',
-    'occurrence_pasture_total',
+    #'occurrence_pasture_total',
     'occurrence_pasture_year',
-    'occurrence_savanna_total',
+    #'occurrence_savanna_total',
     'occurrence_savanna_year',
-    'occurrence_water_total',
+    #'occurrence_water_total',
     'occurrence_water_year'
 ]
 
@@ -69,11 +72,11 @@ N_SAMPLES = 5000
 
 SAMPLE_PARAMS = pd.DataFrame([
     {'label':  3, 'min_samples': N_SAMPLES * 0.20},
-    {'label':  4, 'min_samples': N_SAMPLES * 0.20},
-    {'label': 12, 'min_samples': N_SAMPLES * 0.10},
+    {'label':  4, 'min_samples': N_SAMPLES * 0.05},
+    {'label': 12, 'min_samples': N_SAMPLES * 0.05},
     {'label': 15, 'min_samples': N_SAMPLES * 0.20},
     {'label': 18, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 25, 'min_samples': N_SAMPLES * 0.15},
+    {'label': 25, 'min_samples': N_SAMPLES * 0.10},
     {'label': 33, 'min_samples': N_SAMPLES * 0.15},
 
 ])
@@ -129,15 +132,16 @@ def get_balanced_samples(balance: pd.DataFrame, samples: ee.featurecollection.Fe
 
         label, min_samples = row['label'], row['min_samples']
 
-        n_samples_fill = df_areas.loc[df_areas['class'] == int(label)].shape[0]
+        df_areas_target = df_areas.loc[df_areas['class'] == int(label)] 
+
+        n_samples_fill =  df_areas_target['min_samples'].values[0] if not df_areas_target.empty else 0
 
         if n_samples_fill < min_samples:
             samples_balanced = samples_balanced.merge(samples.filter(
-                ee.Filter.eq('class', label)).limit(n_samples_fill))
+                ee.Filter.eq('class', int(label))).limit(int(min_samples)))
         else:
             samples_balanced = samples_balanced.merge(samples.filter(
-                ee.Filter.eq('class', label)).limit(min_samples))
-            
+                ee.Filter.eq('class', int(label))).limit(int(n_samples_fill)))
 
     return samples_balanced
 
@@ -147,12 +151,16 @@ def get_balanced_samples(balance: pd.DataFrame, samples: ee.featurecollection.Fe
 
 '''
 
+tiles_grid = ee.ImageCollection(ASSET_TILES)
+
 # fs = ee.ImageCollection(ASSET_FEATURE_SPACE_C7).filter('version == "4"')
 fs = ee.ImageCollection(ASSET_FEATURE_SPACE_C9).filter('version == "5"')
 
 
-YEARS = fs.reduceColumns(ee.Reducer.toList(), ['year']).get('list').getInfo()
-YEARS = list(set(YEARS))
+#YEARS = fs.reduceColumns(ee.Reducer.toList(), ['year']).get('list').getInfo()
+#YEARS = list(set(YEARS))
+
+YEARS = [2023]
 
 for year in YEARS:
 
@@ -173,12 +181,22 @@ for year in YEARS:
 
     for tile in tiles:
 
+        tile_image = ee.Image(tiles_grid.filter(f'tile == {tile}').first())
+
+        roi = tile_image.geometry()
+
         samples = ee.FeatureCollection(get_samples(tile=tile, dataset_samples=dataset_samples))\
             .remap(REMAP_FROM, REMAP_TO, 'class')
 
         samples_balanced = get_balanced_samples(SAMPLE_PARAMS, samples, tile)
 
+        
+
         classes = samples_balanced.reduceColumns(ee.Reducer.frequencyHistogram(), ['class']).get('histogram').getInfo()
+
+        pprint(classes)
+
+
         classes_str = [str(x) for x in list(dict(classes).keys())]
         classes_int = [int(x) for x in list(dict(classes).keys())]
 
@@ -192,9 +210,9 @@ for year in YEARS:
 
 
         # image feature space
-        image = ee.Image('{}/{}-{}-{}'.format(ASSET_FEATURE_SPACE_C9, int(tile), year, INPUT_VERSION_DATASET))
+        image = ee.Image('{}/{}-{}-{}'.format(ASSET_FEATURE_SPACE_C9, int(tile), year, '5'))
 
-        print('{}/{}-{}-{}'.format(ASSET_FEATURE_SPACE_C9, int(tile), year, INPUT_VERSION_DATASET))
+        print('{}/{}-{}-{}'.format(ASSET_FEATURE_SPACE_C9, int(tile), year, '5'))
 
         image = image.select(FEATURE_SPACE)
 
@@ -248,3 +266,16 @@ for year in YEARS:
 
         print(f'exporting integration {name}')
 
+        region = roi.getInfo()['coordinates']
+
+        task = ee.batch.Export.image.toAsset(
+            image=classification.addBands(probabilities),
+            description=name,
+            assetId=f'{ASSET_OUTPUT}/{name}',
+            pyramidingPolicy={".default": "mode"},
+            region=region,
+            scale=30,
+            maxPixels=1e+13
+        )
+
+        task.start()
