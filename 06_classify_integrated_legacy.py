@@ -35,7 +35,7 @@ ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
 ASSET_DATASET_INT_C6 = 'projects/imazon-simex/LULC/SAMPLES/COLLECTION6/INTEGRATE'
 
-ASSET_FEATURE_SPACE_C9 = 'projects/imazon-simex/LULC/COLLECTION9/feature-space'
+# ASSET_FEATURE_SPACE_C9 = 'projects/imazon-simex/LULC/COLLECTION9/feature-space'
 ASSET_FEATURE_SPACE_C7 = 'projects/imazon-simex/LULC/COLLECTION7/feature-space'
 ASSET_OUTPUT = 'projects/imazon-simex/LULC/COLLECTION9/probability'
 
@@ -77,7 +77,7 @@ SAMPLE_PARAMS = pd.DataFrame([
     {'label': 15, 'min_samples': N_SAMPLES * 0.20},
     {'label': 18, 'min_samples': N_SAMPLES * 0.10},
     {'label': 25, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 33, 'min_samples': N_SAMPLES * 0.15},
+    {'label': 33, 'min_samples': N_SAMPLES * 0.20},
 
 ])
 
@@ -136,7 +136,7 @@ def get_balanced_samples(balance: pd.DataFrame, samples: ee.featurecollection.Fe
 
         n_samples_fill =  df_areas_target['min_samples'].values[0] if not df_areas_target.empty else 0
 
-        if n_samples_fill < min_samples:
+        if n_samples_fill > min_samples:
             samples_balanced = samples_balanced.merge(samples.filter(
                 ee.Filter.eq('class', int(label))).limit(int(min_samples)))
         else:
@@ -153,14 +153,16 @@ def get_balanced_samples(balance: pd.DataFrame, samples: ee.featurecollection.Fe
 
 tiles_grid = ee.ImageCollection(ASSET_TILES)
 
-# fs = ee.ImageCollection(ASSET_FEATURE_SPACE_C7).filter('version == "4"')
-fs = ee.ImageCollection(ASSET_FEATURE_SPACE_C9).filter('version == "5"')
+# for year <= 2020, version 2
+fs = ee.ImageCollection(ASSET_FEATURE_SPACE_C7).filter('version == "5"')
+
+#fs = ee.ImageCollection(ASSET_FEATURE_SPACE_C9).filter('version == "5"')
 
 
 #YEARS = fs.reduceColumns(ee.Reducer.toList(), ['year']).get('list').getInfo()
 #YEARS = list(set(YEARS))
 
-YEARS = [2023]
+YEARS = [2020]
 
 for year in YEARS:
 
@@ -210,9 +212,9 @@ for year in YEARS:
 
 
         # image feature space
-        image = ee.Image('{}/{}-{}-{}'.format(ASSET_FEATURE_SPACE_C9, int(tile), year, '5'))
+        image = ee.Image('{}/{}-{}-{}'.format(ASSET_FEATURE_SPACE_C7, int(tile), year, '4'))
 
-        print('{}/{}-{}-{}'.format(ASSET_FEATURE_SPACE_C9, int(tile), year, '5'))
+        print('{}/{}-{}-{}'.format(ASSET_FEATURE_SPACE_C7, int(tile), year, '4'))
 
         image = image.select(FEATURE_SPACE)
 
@@ -278,4 +280,4 @@ for year in YEARS:
             maxPixels=1e+13
         )
 
-        task.start()
+        # task.start()
