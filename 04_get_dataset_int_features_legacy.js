@@ -165,7 +165,8 @@ years.forEach(
         var dateStart = year.toString() + '-01-01';
         var dateEnd = year.toString() + '-12-31';
 
-        var classificationYear = collectionFinal.filter(ee.Filter.date(dateStart, dateEnd));
+        var classificationYear = collectionFinal.filter(ee.Filter.date(dateStart, dateEnd))
+            .map(function(image) { return image.unmask(0); });
         
         
         // Number of observations in the year
@@ -245,7 +246,7 @@ years.forEach(
             .addBands(pastureYear)
             .addBands(agricultureYear)
             .addBands(waterYear)
-
+            
         
         image = image
             .set('year', year)
