@@ -19,7 +19,8 @@ from glob import glob
 
 #ee.Initialize(credentials)
 
-PROJECT = 'sad-deep-learning-274812'
+# PROJECT = 'sad-deep-learning-274812'
+PROJECT = 'mapbiomas'
 
 ee.Initialize(project=PROJECT)
 
@@ -37,6 +38,7 @@ ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
+# ASSET_FEATURES = 'projects/imazon-simex/LULC/fs-tiles'
 ASSET_FEATURES = 'projects/imazon-simex/LULC/feature-space'
 
 ASSET_OUTPUT = 'projects/imazon-simex/LULC/COLLECTION9/probability'
@@ -64,7 +66,7 @@ INPUT_FEATURES = [
 ]
 
 
-N_SAMPLES = 5000
+N_SAMPLES = 3000
 
 
 SAMPLE_PARAMS = pd.DataFrame([
@@ -73,7 +75,7 @@ SAMPLE_PARAMS = pd.DataFrame([
     {'label': 12, 'min_samples': N_SAMPLES * 0.05},
     {'label': 15, 'min_samples': N_SAMPLES * 0.20},
     {'label': 18, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 25, 'min_samples': N_SAMPLES * 0.10},
+    {'label': 25, 'min_samples': N_SAMPLES * 0.02},
     {'label': 33, 'min_samples': N_SAMPLES * 0.20},
 
 ])
@@ -149,23 +151,46 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
 
-    
+    samples = pd.concat([samples, list_samples_df])
+    res_sp = []
+
     # check min samples
     for id, row in balance.iterrows():
 
-        label, min_samples = row['label'], row['min_samples']
+        label, min_samples_default = row['label'], row['min_samples']
 
-        n_samples_fill = df_areas.loc[df_areas['class'] == label].shape[0]
+        min_samples_tile = df_areas.loc[df_areas['class'] == label].shape[0]
+
+        n_samples_total = samples.query(f'label == {label}').shape[0]
+
+
+
+        # has samples of class
+        # samples gt min samples
+
+        if n_samples_total == 0: continue 
+
+        if (min_samples_tile < min_samples_default) and n_samples_total > min_samples_default:
+            n_samples_fill = min_samples_default
+        elif (min_samples_tile > min_samples_default) and min_samples_tile > min_samples_default:
+            n_samples_fill = min_samples_tile
+        else: continue
+
 
         if label == 33: 
-            count_sp = 50 if n_samples_fill > 50 else n_samples_fill
-            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=count_sp)
+            n_samples_fill = 50 if n_samples_fill > 50 else n_samples_fill
+            samples_cls = samples.query(f'label == {label}').sample(n=int(n_samples_fill))
         else:
-            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=n_samples_fill)
+            samples_cls = samples.query(f'label == {label}').sample(n=int(n_samples_fill))
 
-        samples = pd.concat([samples, fill_samples_df])
+        
+        
+        res_sp.append(samples_cls)
 
-    return samples
+    
+    samples_final = pd.concat(res_sp)
+
+    return samples_final
 
 '''
 
@@ -178,18 +203,42 @@ roi = ee.FeatureCollection(ASSET_ROI).filter('Bioma == "Amazônia"')
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+tiles_list = list(set(tiles_list))
 
 print(tiles_list[:1])
 
-YEARS = [2021]
+YEARS = [
+    # 1985, 
+    # 1986, 
+    # 1987,
+    # 1988, 
+    # 1989, 
+    # 1990, 1991, 
+    # 1992, 
+    # 1993, 1994, 
+    # 1995, 
+    # 1996,
+    1997, 
+    1998, 
+    1999
+]
 
 for year in YEARS:
 
-    for tile in tiles_list:
+    tiles_loaded = ee.ImageCollection(ASSET_OUTPUT).filter(f'year == {str(year)}')\
+        .reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+    
+    tiles_iter = list(set(tiles_list) - set(tiles_loaded))
+
+    for tile in tiles_iter:
+
+        #if tile in tiles_loaded: continue
 
         tile_image = ee.Image(tiles.filter(f'tile == {tile}').first())
 
         roi = tile_image.geometry()
+
+        region = roi.getInfo()['coordinates']
 
         center = roi.centroid()
 
@@ -201,10 +250,14 @@ for year in YEARS:
             assetInfo = ee.data.getAsset(assetId)
         except Exception as e: 
 
-            asset_feat_tile = '{}/{}-{}-{}'.format(ASSET_FEATURES, str(tile), str(year), FS_VERSION)
+            # asset_feat_tile = '{}/{}-{}-1'.format(ASSET_FEATURES, str(tile), str(year))
+            asset_feat_tile = '{}/feature-space-{}-9-1'.format(ASSET_FEATURES, str(year))
+
+            print(asset_feat_tile)
 
             # get image
-            image = ee.Image(asset_feat_tile) 
+            image = ee.Image(asset_feat_tile).mask(tile_image)
+            image = image.mask(image.select('observations_year').gt(0))
 
             # get samples
             samples_df = get_samples(tile=tile)
@@ -214,6 +267,8 @@ for year in YEARS:
             df_samples_all = get_balanced_samples(balance=SAMPLE_PARAMS, samples=samples_df)
             df_samples_all = df_samples_all[INPUT_FEATURES + ['label', 'geometry']]
             df_samples_all = df_samples_all.replace(SAMPLE_REPLACE_VAL)
+
+            print(df_samples_all.shape)
       
             samples = geemap.geopandas_to_ee(df_samples_all)
 
@@ -221,6 +276,8 @@ for year in YEARS:
             # get labels for this image
             labels_classified = df_samples_all['label'].drop_duplicates().values
             labels_classified = [str(x) for x in labels_classified]
+
+            print(labels_classified)
 
 
             # classify
@@ -261,20 +318,16 @@ for year in YEARS:
             classification = classification.toByte()
             classification = classification.set('version', OUTPUT_VERSION)
             classification = classification.set('collection_id', 9.0)
-            classification = classification.set('biome', 'AMAZONIA')
-            classification = classification.set('territory', 'AMAZONIA')
-            classification = classification.set('source', 'Imazon')
+            classification = classification.set('tile', str(tile))
             classification = classification.set('year', year)
 
             probabilities = probabilities.toByte()
             probabilities = probabilities.set('version', OUTPUT_VERSION)
             probabilities = probabilities.set('collection_id', 9.0)
-            probabilities = probabilities.set('biome', 'AMAZONIA')
-            probabilities = probabilities.set('territory', 'AMAZONIA')
-            probabilities = probabilities.set('source', 'Imazon')
+            probabilities = probabilities.set('tile', str(tile))
             probabilities = probabilities.set('year', year)
 
-            region = roi.getInfo()['coordinates']
+            
 
             print(f'exporting image: {name}')
 
@@ -288,5 +341,12 @@ for year in YEARS:
                 maxPixels=1e+13
             )
 
-            #task.start()
+            task.start()
 
+'''
+Meu carro foi batido na traseira por outra pessoa. Ambos os carros tem seguro. Mas eu (dono do carro batido) 
+não quero usar a franquia mínima do meu seguro, pois se eu bater no futuro, perderei esse direito. A dona do carro que 
+bateu o meu, quer usar a franquia mínima para pagar o concerto. Isso é justo? Eu tenho direito de não usar o meu seguro e fazer ela pagar?
+
+considere um cenário de embate jurídico, quem tem direito? 
+'''

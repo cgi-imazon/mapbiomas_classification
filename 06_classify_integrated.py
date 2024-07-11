@@ -40,7 +40,7 @@ ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
-ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/integrated'
+ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/lulc/legal_amazon/classification'
 
 ASSET_FEATURES = 'projects/imazon-simex/LULC/LEGAL_AMAZON/features-int'
 
@@ -173,12 +173,15 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
     list_samples = random.sample(list_samples, int(len(list_samples) * 0.5))
     list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
 
+    samples = pd.concat([samples, list_samples_df])
+
     # balance samples based on stratified area
     df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
 
-    
+    res = []
+
     # check min samples
     for id, row in balance.iterrows():
 
@@ -188,13 +191,16 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
         if label == 33: 
             count_sp = 50 if n_samples_fill > 50 else n_samples_fill
-            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=count_sp)
+            fill_samples_df = samples.query(f'label == {label}').sample(n=count_sp)
         else:
-            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=n_samples_fill)
+            fill_samples_df = samples.query(f'label == {label}').sample(n=n_samples_fill)
 
-        samples = pd.concat([samples, fill_samples_df])
+        res.append(fill_samples_df)
+        
 
-    return samples
+    samples_final = pd.concat(res)
+
+    return samples_final
 
 def save_log():
     pass
