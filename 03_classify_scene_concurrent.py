@@ -43,7 +43,7 @@ ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
-ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/classification'
+ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/lulc/legal_amazon/classification'
 
 OUTPUT_VERSION = '1'
 
@@ -97,8 +97,9 @@ YEARS = [
     # 2005, 2006, 2007, 2008,
     # 2009, 2010, 2011, 2012, 2013, 2014,
     # 2015, 2016, 2017, 2018, 2019, 2020,
-    # 2021, 2022, 
-    2023
+    # 2021,
+    2022, 
+    # 2023
 ]
 
 
@@ -322,7 +323,7 @@ roi = ee.FeatureCollection(ASSET_ROI)
 
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
-tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+# tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 
 '''
     
@@ -334,10 +335,13 @@ tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getI
     description: if missing features, fill samples from the etire period
 '''
 
+
 '''
     description: if missing features, fill samples from the etire period
 '''
 def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
+
+    res = []
 
     # total dataset samples
     list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*'))
@@ -347,11 +351,10 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
     list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
 
     # balance samples based on stratified area
-    df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
+    #df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
+    df_areas = pd.read_csv(PATH_AREAS).query(f'year == 2023 and tile == {tile}')
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
-
-    print(df_areas.shape)
 
     
     # check min samples
@@ -359,9 +362,11 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
         label, min_samples_default = row['label'], row['min_samples']
 
-        if df_areas.shape[0] > 0:
-            min_samples_area = df_areas.query(f'cls == {label} and year == {str(year)}')
-            min_samples_area = min_samples_area['min_samples'].values[0]
+        # df_areas_year = df_areas.query(f'cls == {label} and year == {str(year)}')
+        df_areas_year = df_areas.query(f'cls == {label} and year == 2023')
+
+        if df_areas_year.shape[0] > 0:
+            min_samples_area = int(df_areas_year['min_samples'].values[0])
         else: 
             min_samples_area = 0
             
@@ -372,18 +377,18 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
         if sp_available > min_samples_area:
             samples_selected = samples.query(f'label == {label}').sample(n=min_samples_area)
         else:
-            n_sp = min_samples_area - sp_available
+            n_sp = int(min_samples_area - sp_available)
 
             samples_selected_plus = list_samples_df.query(f'label == {label}').sample(n=n_sp)
             samples_selected_avail = samples.query(f'label == {label}').sample(n=sp_available)
 
             samples_selected = pd.concat([samples_selected_avail, samples_selected_plus])
 
+        res.append(samples_selected)
 
+    samples_classification = pd.concat(res)
 
-
-    return samples_selected
-
+    return samples_classification
 def get_samples(tile: int, date: str, sr='l8'):
 
     res = []
@@ -478,6 +483,14 @@ image_list_loaded = ee.ImageCollection(ASSET_OUTPUT)\
     
 
 for year in YEARS:
+
+    image_list_loaded = ee.ImageCollection(ASSET_OUTPUT)\
+        .filter(f'version == "1" and year == {str(year)}')\
+        .reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
+        #.filterBounds(coords)\
+
+    tiles_list =  list(glob(f'{PATH_DIR}/data/{year}/*'))
+    tiles_list = [int(x.split('/')[-1]) for x in tiles_list]
 
     for tile in tiles_list:
 

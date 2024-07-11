@@ -161,6 +161,8 @@ tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 '''
 def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
+    res = []
+
     # total dataset samples
     list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*'))
 
@@ -169,11 +171,10 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
     list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
 
     # balance samples based on stratified area
-    df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
+    #df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
+    df_areas = pd.read_csv(PATH_AREAS).query(f'year == 2023 and tile == {tile}')
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
-
-    print(df_areas.shape)
 
     
     # check min samples
@@ -181,12 +182,15 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
         label, min_samples_default = row['label'], row['min_samples']
 
-        if df_areas.shape[0] > 0:
-            min_samples_area = df_areas.query(f'cls == {label} and year == {str(year)}')
-            min_samples_area = min_samples_area['min_samples'].values[0]
+        # df_areas_year = df_areas.query(f'cls == {label} and year == {str(year)}')
+        df_areas_year = df_areas.query(f'cls == {label} and year == 2023')
+
+        if df_areas_year.shape[0] > 0:
+            min_samples_area = int(df_areas_year['min_samples'].values[0])
         else: 
             min_samples_area = 0
             
+        print('min', min_samples_area)
 
         # check samples available
         sp_available = samples.query(f'label == {label}').shape[0]
@@ -194,17 +198,18 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
         if sp_available > min_samples_area:
             samples_selected = samples.query(f'label == {label}').sample(n=min_samples_area)
         else:
-            n_sp = min_samples_area - sp_available
+            n_sp = int(min_samples_area - sp_available)
 
             samples_selected_plus = list_samples_df.query(f'label == {label}').sample(n=n_sp)
             samples_selected_avail = samples.query(f'label == {label}').sample(n=sp_available)
 
             samples_selected = pd.concat([samples_selected_avail, samples_selected_plus])
 
+        res.append(samples_selected)
 
+    samples_classification = pd.concat(res)
 
-
-    return samples_selected
+    return samples_classification
 
 
 def get_samples(tile: int, date: str, sr='l8'):
@@ -306,8 +311,6 @@ for year in YEARS:
 
     tiles_list =  list(glob(f'{PATH_DIR}/data/{year}/*'))
     tiles_list = [int(x.split('/')[-1]) for x in tiles_list]
-
-    print(tiles_list)
 
 
     for tile in tiles_list:
@@ -422,6 +425,8 @@ for year in YEARS:
                 df_samples_all = get_balanced_samples(balance=SAMPLE_PARAMS, samples=df_samples_all)
                 df_samples_all = df_samples_all[INPUT_FEATURES + ['label', 'geometry']]
                 df_samples_all = df_samples_all.replace(SAMPLE_REPLACE_VAL)
+
+                print(df_samples_all.head(5))
 
                 # convert to ee features
                 samples = geemap.geopandas_to_ee(df_samples_all)
