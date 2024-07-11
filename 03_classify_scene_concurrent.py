@@ -333,6 +333,10 @@ tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getI
 '''
     description: if missing features, fill samples from the etire period
 '''
+
+'''
+    description: if missing features, fill samples from the etire period
+'''
 def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
     # total dataset samples
@@ -347,30 +351,38 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
 
+    print(df_areas.shape)
 
     
     # check min samples
     for id, row in balance.iterrows():
 
-        label, min_samples = row['label'], row['min_samples']
+        label, min_samples_default = row['label'], row['min_samples']
 
-        n_samples_fill = df_areas.query(f'cls == {label}').shape[0]
+        if df_areas.shape[0] > 0:
+            min_samples_area = df_areas.query(f'cls == {label} and year == {str(year)}')
+            min_samples_area = min_samples_area['min_samples'].values[0]
+        else: 
+            min_samples_area = 0
+            
 
-        fill_samples_agri_df = list_samples_df.query(f'label == 18').sample(n=60)
+        # check samples available
+        sp_available = samples.query(f'label == {label}').shape[0]
 
-        if label == 33: 
-            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=50)
+        if sp_available > min_samples_area:
+            samples_selected = samples.query(f'label == {label}').sample(n=min_samples_area)
         else:
-            fill_samples_df = list_samples_df.query(f'label == {label}').sample(n=n_samples_fill)
+            n_sp = min_samples_area - sp_available
+
+            samples_selected_plus = list_samples_df.query(f'label == {label}').sample(n=n_sp)
+            samples_selected_avail = samples.query(f'label == {label}').sample(n=sp_available)
+
+            samples_selected = pd.concat([samples_selected_avail, samples_selected_plus])
 
 
-        if label == 18: 
-            samples = pd.concat([samples, fill_samples_df, fill_samples_agri_df])
-        else:
-            samples = pd.concat([samples, fill_samples_df])
 
-    return samples
 
+    return samples_selected
 
 def get_samples(tile: int, date: str, sr='l8'):
 
