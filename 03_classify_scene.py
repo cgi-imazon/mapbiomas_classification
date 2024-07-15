@@ -34,7 +34,8 @@ PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 
 PATH_LOGFILE = f'{PATH_DIR}/data/log.csv'
 
-PATH_AREAS = 'data/area/areas_la.csv'
+# PATH_AREAS = 'data/area/areas_la.csv'
+PATH_AREAS = 'data/area/areas_la_1985_2022.csv'
 
 ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
@@ -94,8 +95,8 @@ YEARS = [
     # 2005, 2006, 2007, 2008,
     # 2009, 2010, 2011, 2012, 2013, 2014,
     # 2015, 2016, 2017, 2018, 2019, 2020,
-    # 2021, 
-    2022, 
+    2021, 
+    # 2022, 
     # 2023
 ]
 
@@ -148,7 +149,8 @@ roi = ee.FeatureCollection(ASSET_ROI)
 
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
-# tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+tiles_list = list(set(tiles_list))
 
 '''
     
@@ -171,8 +173,7 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
     list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
 
     # balance samples based on stratified area
-    #df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
-    df_areas = pd.read_csv(PATH_AREAS).query(f'year == 2023 and tile == {tile}')
+    df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
 
@@ -182,15 +183,13 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
         label, min_samples_default = row['label'], row['min_samples']
 
-        # df_areas_year = df_areas.query(f'cls == {label} and year == {str(year)}')
-        df_areas_year = df_areas.query(f'cls == {label} and year == 2023')
+        df_areas_year = df_areas.query(f'cls == {label}')
 
         if df_areas_year.shape[0] > 0:
             min_samples_area = int(df_areas_year['min_samples'].values[0])
         else: 
             min_samples_area = 0
             
-        print('min', min_samples_area)
 
         # check samples available
         sp_available = samples.query(f'label == {label}').shape[0]
@@ -205,11 +204,28 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
             samples_selected = pd.concat([samples_selected_avail, samples_selected_plus])
 
+
         res.append(samples_selected)
+
+    # add samples to rare classes
+    min_samples_gras = list_samples_df.query('label == 12').sample(n=15)
+    min_samples_agr = list_samples_df.query('label == 18').sample(n=30)
+    min_samples_water = list_samples_df.query('label == 33').sample(n=30)
+    min_samles_savana = list_samples_df.query('label == 4').sample(n=45)
+    min_samles_savana = list_samples_df.query('label == 15').sample(n=20)
+    min_samles_forest = list_samples_df.query('label == 3').sample(n=15)
+
+    # 
+    res.append(min_samples_gras)
+    res.append(min_samples_agr)
+    res.append(min_samples_water)
+    res.append(min_samles_savana)
+    res.append(min_samles_forest)
 
     samples_classification = pd.concat(res)
 
     return samples_classification
+
 
 
 def get_samples(tile: int, date: str, sr='l8'):
@@ -309,8 +325,8 @@ for year in YEARS:
         .reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
         #.filterBounds(coords)\
 
-    tiles_list =  list(glob(f'{PATH_DIR}/data/{year}/*'))
-    tiles_list = [int(x.split('/')[-1]) for x in tiles_list]
+    #tiles_list =  list(glob(f'{PATH_DIR}/data/{year}/*'))
+    #tiles_list = [int(x.split('/')[-1]) for x in tiles_list]
 
 
     for tile in tiles_list:
@@ -380,6 +396,7 @@ for year in YEARS:
         image_list = images.reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
 
         image_list = list(set(image_list) - set(image_list_loaded))
+        image_list = list(set(image_list))
 
         for img_id in image_list:
 
@@ -448,6 +465,8 @@ for year in YEARS:
                 # get labels for this image
                 labels_classified = df_samples_all['label'].drop_duplicates().values
                 labels_classified = [str(x) for x in labels_classified]
+
+                print(labels_classified)
 
 
 
