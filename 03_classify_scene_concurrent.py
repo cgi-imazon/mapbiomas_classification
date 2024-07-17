@@ -44,7 +44,8 @@ ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
-ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/lulc/legal_amazon/classification'
+#ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/lulc/legal_amazon/classification'
+ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/classification'
 
 OUTPUT_VERSION = '1'
 
@@ -392,15 +393,18 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
     # add samples to rare classes
     min_samples_gras = list_samples_df.query('label == 12').sample(n=15)
-    min_samples_agr = list_samples_df.query('label == 18').sample(n=30)
-    min_samples_water = list_samples_df.query('label == 33').sample(n=30)
-    min_samles_savana = list_samples_df.query('label == 4').sample(n=45)
-    min_samles_savana = list_samples_df.query('label == 15').sample(n=20)
+    min_samples_agr = list_samples_df.query('label == 18').sample(n=15)
+    min_samples_water = list_samples_df.query('label == 33').sample(n=15)
+    min_samles_savana = list_samples_df.query('label == 4').sample(n=15)
+    min_samles_savana = list_samples_df.query('label == 15').sample(n=15)
+    min_samles_forest = list_samples_df.query('label == 3').sample(n=15)
 
+    # 
     res.append(min_samples_gras)
     res.append(min_samples_agr)
     res.append(min_samples_water)
     res.append(min_samles_savana)
+    res.append(min_samles_forest)
 
     samples_classification = pd.concat(res)
 

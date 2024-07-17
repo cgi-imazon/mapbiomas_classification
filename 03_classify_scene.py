@@ -19,7 +19,8 @@ from glob import glob
 
 #ee.Initialize(credentials)
 
-PROJECT = 'sad-deep-learning-274812'
+# PROJECT = 'sad-deep-learning-274812'
+PROJECT = 'ee-mapbiomas-imazon'
 
 ee.Initialize(project=PROJECT)
 
@@ -41,7 +42,7 @@ ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
-ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/lulc/legal_amazon/classification'
+ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/classification'
 
 OUTPUT_VERSION = '1'
 
@@ -209,10 +210,10 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
     # add samples to rare classes
     min_samples_gras = list_samples_df.query('label == 12').sample(n=15)
-    min_samples_agr = list_samples_df.query('label == 18').sample(n=30)
-    min_samples_water = list_samples_df.query('label == 33').sample(n=30)
-    min_samles_savana = list_samples_df.query('label == 4').sample(n=45)
-    min_samles_savana = list_samples_df.query('label == 15').sample(n=20)
+    min_samples_agr = list_samples_df.query('label == 18').sample(n=15)
+    min_samples_water = list_samples_df.query('label == 33').sample(n=15)
+    min_samles_savana = list_samples_df.query('label == 4').sample(n=15)
+    min_samles_savana = list_samples_df.query('label == 15').sample(n=15)
     min_samles_forest = list_samples_df.query('label == 3').sample(n=15)
 
     # 
@@ -275,46 +276,6 @@ def save_log():
     Iteration
 
 '''
-
-coords = ee.Geometry.MultiPoint([
-    [
-      -45.84161564370343,
-      -13.18404107200111
-    ],
-    [
-      -44.89679142495343,
-      -13.18404107200111
-    ],
-    [
-      -47.57745548745343,
-      -11.466814921111393
-    ],
-    [
-      -45.95147892495343,
-      -11.617513108005902
-    ],
-    [
-      -44.54601314104589,
-      -11.6539937379325
-    ],
-    [
-      -47.05089595354589,
-      -11.46024930196413
-    ],
-    [
-      -44.72179439104589,
-      -10.65157446115599
-    ],
-    [
-      -46.38072993792089,
-      -10.500378754553292
-    ],
-    [
-      -47.50133540667089,
-      -10.197766401098274
-    ]
-])
-
 
     
 

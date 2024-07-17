@@ -18,8 +18,8 @@ from pprint import pprint
 
 #ee.Initialize(credentials)
 
-PROJECT = 'sad-deep-learning-274812'
-# PROJECT = 'mapbiomas'
+# PROJECT = 'ee-mapbiomas-imazon'
+PROJECT = 'mapbiomas'
 
 ee.Authenticate()
 ee.Initialize(project=PROJECT)
@@ -90,7 +90,8 @@ YEARS = [
     # 2003, 2004, 
     # 2005, 2006, 2007, 2008,
     # 2009, 2010, 2011, 2012, 2013, 2014,
-    2015, 2016, 2017, 2018, 2019, 2020,
+    # 2015, 2016, 2017, 2018, 2019, 
+    2020,
     # 2021, 
     # 2022, 
     #2023
