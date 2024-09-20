@@ -31,7 +31,7 @@ ee.Initialize(project=PROJECT)
 
 '''
 
-PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon/data'
+PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon/sentinel'
 
 ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
@@ -168,7 +168,7 @@ print('samples ' + str(samples.size().getInfo()))
 
 
 
-@retry()
+# @retry()
 def get_dataset(tile_id: str):
 
     # check if file already exists
@@ -176,7 +176,7 @@ def get_dataset(tile_id: str):
         print(1)
         return None
 
-    mosaic = ee.ImageCollection(ASSET_MOSAICS)
+    
 
     tile_image = ee.Image(tiles.filter(f'grid_name == "{tile_id}"').first())
 
@@ -186,11 +186,13 @@ def get_dataset(tile_id: str):
 
     samples_harmonized_tile = samples_harmonized.filterBounds(roi)
 
+    print(f'grid_name == "{tile_id}"')
+
     image = ee.Image(mosaic.filter(f'grid_name == "{tile_id}"').first())
-    image = image.divide(10000).copyProperties(image)
+    image = ee.Image(image.divide(10000)).copyProperties(image)
    
 
-    image = get_fractions(image=image)
+    image = get_fractions_mosaic(image=image)
     image = get_ndfi(image=image)
     image = get_csfi(image=image)
 
@@ -267,14 +269,34 @@ for year in YEARS:
         year_sample
     ).select([year_sample], ['label'])
 
+    mosaic = ee.ImageCollection(ASSET_MOSAICS)\
+        .filter('biome == "AMAZONIA"')\
+        .filter(f'year == {year}')
    
     # check if dir exists
     if not os.path.exists(f'{PATH_DIR}/data/{str(year)}'):
         os.makedirs(f'{PATH_DIR}/data/{str(year)}')
-    else: continue
+    
+    for tile_id in tiles_list:
+
+        print(tile_id)
+
+        samples_image_gdf = get_dataset(tile_id)
+
+        try:
+            # export geodataframe
+            samples_image_gdf[0].to_file(
+                f'{PATH_DIR}/data/{str(year)}/{samples_image_gdf[1]}.geojson', driver='GeoJSON'
+            ) 
+
+        except Exception as e:
+            print(e)
+            continue
     
 
-    export_dataset(tiles_list, year)
+
+
+    # export_dataset(tiles_list, year)
 
 
     
