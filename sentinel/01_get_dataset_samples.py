@@ -174,7 +174,7 @@ def get_dataset(image_id: str):
         print(1)
         return None
 
-    image = ee.Image(images.filter(f'LANDSAT_SCENE_ID == "{image_id}"').first())
+    image = ee.Image(images.filter(f'system:index == "{image_id}"').first())
     
     image = get_fractions(image=image)
     image = get_ndfi(image=image)
@@ -276,7 +276,6 @@ for year in YEARS:
             ee.ImageCollection(ASSET_LANDSAT_IMAGES['s2']['idCollection'])
             .filterBounds(center)
             .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
-            #.map(lambda image: apply_scale_factors(image))
             .map(lambda image: image.set('sensor', 's2'))
             .select(
                 ASSET_LANDSAT_IMAGES['s2']['bandNames'], 
@@ -284,7 +283,7 @@ for year in YEARS:
             )
         )
 
-        image_list = images.reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
+        image_list = images.reduceColumns(ee.Reducer.toList(), ['system:index']).get('list').getInfo()
 
         print(f'n images {len(image_list)}')
 
