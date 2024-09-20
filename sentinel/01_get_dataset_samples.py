@@ -31,7 +31,7 @@ ee.Initialize(project=PROJECT)
 
 '''
 
-PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
+PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon/data'
 
 ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
@@ -42,38 +42,22 @@ ASSET_SAMPLES = 'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_co
 
 
 
-LANDSAT_NEW_NAMES = [
+SENTINEL_NEW_NAMES = [
     'blue',
     'green',
     'red',
+    'red_edge_1',
     'nir',
     'swir1',
     'swir2',
-    'pixel_qa',
-    'tir'
+    'pixel_qa'
 ]
 
 ASSET_LANDSAT_IMAGES = {
-    'l5c2' : {
-        'idCollection': 'LANDSAT/LT05/C02/T1_L2',
-        'bandNames': ['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'QA_PIXEL', 'ST_B6'],
-        'newBandNames': LANDSAT_NEW_NAMES,
-        'defaultVisParams': {}
-    },
-    'l7c2' : {
-        'idCollection': 'LANDSAT/LE07/C02/T1_L2',
-        'bandNames': ['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'QA_PIXEL', 'ST_B6'],
-        'newBandNames': LANDSAT_NEW_NAMES,
-    },
-    'l8c2' : {
-        'idCollection': 'LANDSAT/LC08/C02/T1_L2',
-        'bandNames': ['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'QA_PIXEL', 'ST_B10'],
-        'newBandNames': LANDSAT_NEW_NAMES,
-    },
-    'l9c2' : {
-        'idCollection': 'LANDSAT/LC09/C02/T1_L2',
-        'bandNames': ['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'QA_PIXEL', 'ST_B10'],
-        'newBandNames': LANDSAT_NEW_NAMES,
+    's2':{
+        'idCollection': '',
+        'bandNames': ['B2', 'B3', 'B4', 'B5', 'B8', 'B11', 'B12', 'QA60'],
+        'newBandNames': SENTINEL_NEW_NAMES,
     }
 }
 
@@ -288,60 +272,17 @@ for year in YEARS:
 
 
 
-        # get landsat images by roi
-        l5 = (
-            ee.ImageCollection(ASSET_LANDSAT_IMAGES['l5c2']['idCollection'])
+        images = (
+            ee.ImageCollection(ASSET_LANDSAT_IMAGES['s2']['idCollection'])
             .filterBounds(center)
             .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
-            .map(lambda image: apply_scale_factors(image))
-            .map(lambda image: image.set('sensor', 'l5'))
+            #.map(lambda image: apply_scale_factors(image))
+            .map(lambda image: image.set('sensor', 's2'))
             .select(
-                ASSET_LANDSAT_IMAGES['l5c2']['bandNames'], 
-                ASSET_LANDSAT_IMAGES['l5c2']['newBandNames'])
-            .map(lambda image: remove_cloud(image))
-
+                ASSET_LANDSAT_IMAGES['s2']['bandNames'], 
+                ASSET_LANDSAT_IMAGES['s2']['newBandNames']
+            )
         )
-
-        l7 = (
-            ee.ImageCollection(ASSET_LANDSAT_IMAGES['l7c2']['idCollection'])
-            .filterBounds(center)
-            .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
-            .map(lambda image: apply_scale_factors(image))
-            .map(lambda image: image.set('sensor', 'l7'))
-            .select(
-                ASSET_LANDSAT_IMAGES['l7c2']['bandNames'], 
-                ASSET_LANDSAT_IMAGES['l7c2']['newBandNames'])
-            .map(lambda image: remove_cloud(image))
-
-        )
-
-        l8 = (
-            ee.ImageCollection(ASSET_LANDSAT_IMAGES['l8c2']['idCollection'])
-            .filterBounds(center)
-            .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
-            .map(lambda image: apply_scale_factors(image))
-            .map(lambda image: image.set('sensor', 'l8'))
-            .select(
-                ASSET_LANDSAT_IMAGES['l8c2']['bandNames'], 
-                ASSET_LANDSAT_IMAGES['l8c2']['newBandNames'])
-            .map(lambda image: remove_cloud(image))
-
-        )
-
-        l9 = (
-            ee.ImageCollection(ASSET_LANDSAT_IMAGES['l9c2']['idCollection'])
-            .filterBounds(center)
-            .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
-            .map(lambda image: apply_scale_factors(image))
-            .map(lambda image: image.set('sensor', 'l9'))
-            .select(
-                ASSET_LANDSAT_IMAGES['l9c2']['bandNames'], 
-                ASSET_LANDSAT_IMAGES['l9c2']['newBandNames'])
-            .map(lambda image: remove_cloud(image))
-
-        )
-
-        images = ee.ImageCollection(l5.merge(l7).merge(l8).merge(l9))
 
         image_list = images.reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
 
