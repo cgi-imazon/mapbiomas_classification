@@ -20,7 +20,7 @@ from glob import glob
 #ee.Initialize(credentials)
 
 # PROJECT = 'sad-deep-learning-274812'
-PROJECT = 'ee-mapbiomas-imazon'
+PROJECT = 'mapbiomas'
 
 ee.Initialize(project=PROJECT)
 
@@ -94,9 +94,18 @@ YEARS = [
     # 2000, 2001, 2002,
     # 2003, 2004, 
     # 2005, 2006, 2007, 2008,
-    # 2009, 2010, 2011, 2012, 2013, 2014,
-    # 2015, 2016, 2017, 2018, 2019, 2020,
-    2021, 
+    # 2009, 2010, 
+    2011, 
+    # 2012, 
+    # 2013, 
+    # 2014,
+    # 2015, 
+    # 2016, 
+    # 2017, 
+    # 2018,
+    # 2019,
+    # 2020,
+    # 2021, 
     # 2022, 
     # 2023
 ]
@@ -152,6 +161,10 @@ tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 tiles_list = list(set(tiles_list))
+
+# select half
+half = int(len(tiles_list) / 2)
+tiles_list = tiles_list[:half]
 
 '''
     
@@ -537,6 +550,14 @@ Map.addLayer(classification.randomVisualizer())
 Map.centerObject(image,12)
 
 https://code.earthengine.google.com/030bcb76dfcc14dfeb8b3880c23cb8cd
+
+
+
+610319
+612241
+617225
+629076
+
 '''
 
 
