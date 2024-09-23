@@ -174,7 +174,7 @@ def get_dataset(tile_id: str):
     # check if file already exists
     if os.path.isfile(f'{PATH_DIR}/data/{str(year)}/{tile_id}.geojson'):
         print(1)
-        return None
+        return None, None
 
     
 
@@ -188,39 +188,46 @@ def get_dataset(tile_id: str):
 
     print(f'grid_name == "{tile_id}"')
 
-    image = ee.Image(mosaic.filter(f'grid_name == "{tile_id}"').first())
-    image = ee.Image(image.divide(10000)).copyProperties(image)
-   
+    try:
+        image = ee.Image(mosaic.filter(f'grid_name == "{tile_id}"').first())
+        image = ee.Image(image.divide(10000)).copyProperties(image)
+    
+        image = get_fractions_mosaic(image=image)
+        image = get_ndfi(image=image)
+        image = get_csfi(image=image)
 
-    image = get_fractions_mosaic(image=image)
-    image = get_ndfi(image=image)
-    image = get_csfi(image=image)
-
-    # select features
-    image = ee.Image(image).select(INPUT_FEATURES)
+        # select features
+        image = ee.Image(image).select(INPUT_FEATURES)
     
 
 
-    # get features
-    samples_image = image.sampleRegions(
-        collection = samples_harmonized_tile, 
-        scale = 30, 
-        geometries = True
-    )
+        # get features
+        samples_image = image.sampleRegions(
+            collection = samples_harmonized_tile, 
+            scale = 30, 
+            geometries = True
+        )
 
-    # set properties
-    samples_image = samples_image.map(lambda feat: feat.copyProperties(image))
-    samples_image = samples_image.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))
-    samples_image = samples_image.map(lambda feat: feat.set('tile', tile_id))
+        # set properties
+        samples_image = samples_image.map(lambda feat: feat.copyProperties(image))
+        samples_image = samples_image.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))
+        samples_image = samples_image.map(lambda feat: feat.set('tile', tile_id))
 
 
-    # convert to geodataframe
-    samples_image_gdf = ee.data.computeFeatures({
-        'expression': samples_image,
-        'fileFormat': 'GEOPANDAS_GEODATAFRAME'
-    })
+        # convert to geodataframe
+        samples_image_gdf = ee.data.computeFeatures({
+            'expression': samples_image,
+            'fileFormat': 'GEOPANDAS_GEODATAFRAME'
+        })
 
-    return samples_image_gdf, tile_id
+        return samples_image_gdf, tile_id
+    
+    except Exception as e:
+        print(e)
+        return None, None
+
+
+
 
 
 def export_dataset(tiles_list: list, year:int):
@@ -282,6 +289,10 @@ for year in YEARS:
         print(tile_id)
 
         samples_image_gdf = get_dataset(tile_id)
+
+        print(samples_image_gdf)
+
+        if samples_image_gdf[0] is None: continue
 
         try:
             # export geodataframe
