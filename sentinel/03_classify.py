@@ -4,7 +4,7 @@ import sys, os
 sys.path.append(os.path.abspath('.'))
 
 
-import time
+import geemap
 import geopandas as gpd
 import pandas as pd
 
@@ -41,9 +41,11 @@ ASSET_TILES =  'projects/mapbiomas-mosaics/assets/SENTINEL/BRAZIL/mosaics-3'
 
 ASSET_MOSAICS =  'projects/mapbiomas-mosaics/assets/SENTINEL/BRAZIL/mosaics-3'
 
-ASSET_SAMPLES = '{}/data/area'.format(PATH_DIR)
+PATH_SAMPLES = '{}/data'.format(PATH_DIR)
 
-ASSET_OUTPUT = ''
+PATH_REFERENCE_AREA = '{}/data/area/area_lulc_s2.csv'.format(PATH_DIR)
+
+ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/lulc/sentinel/classification'
 
 
 
@@ -131,7 +133,7 @@ SAMPLE_PARAMS = [
 ]
 
 SAMPLE_REPLACE_VAL = {
-    'classe':{
+    'label':{
         6:3,
         5:3,
 
@@ -175,9 +177,7 @@ tiles = ee.ImageCollection(ASSET_TILES)\
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['grid_name']).get('list').getInfo()
 
-df_samples = pd.concat([pd.read_csv(x) for x in glob('{}/*'.format(ASSET_SAMPLES))])
-df_samples = df_samples.replace(SAMPLE_REPLACE_VAL)
-df_samples = df_samples.groupby(by=['classe','year','grid_name'])['area_ha'].sum().reset_index()
+df_reference_area = pd.read_csv(PATH_REFERENCE_AREA)
 
 
 '''
@@ -191,18 +191,43 @@ def get_samples(tile_id, year):
 
     df_sp = pd.DataFrame([])
 
-    df_proportion = df_samples.loc[
-        (df_samples['grid_name'] == tile_id) &
-        (df_samples['year'] == year)
+    df_proportion = df_reference_area.loc[
+        (df_reference_area['grid_name'] == tile_id) &
+        (df_reference_area['year'] == year)
     ]
 
     df_proportion['area_p'] = df_proportion['area_ha'] / df_proportion['area_ha'].sum()
 
-    print(df_proportion)
+    for item in SAMPLE_PARAMS:
+        min_samples = int(item['min_samples'])
+        label = item['label']
+
+        df_proportion_classe = df_proportion.loc[df_proportion['classe'] == label]
+        no_classe = len(df_proportion_classe) == 0
+
+        total_samples = 0 if no_classe else int(df_proportion_classe['area_p'].values[0] * N_SAMPLES)
+
+        # check if there is enought samples to use, if no, use min samples
+        n_samples_to_get = min_samples if total_samples < min_samples else total_samples
+
+        df_samples_year_cls = df_samples.loc[
+            (df_samples['label'] == label) &
+            (df_samples['year'] == year)
+        ]
+
+        # check existent samples
+        exist_samples = len(df_samples_year_cls)
+
+        n_samples_final = exist_samples if n_samples_to_get > exist_samples else n_samples_to_get
+
+        if n_samples_final == 0: continue
+
+        df_samples_sampled = df_samples_year_cls.sample(n=n_samples_final, random_state=42)
+
+        df_sp = pd.concat([df_sp, df_samples_sampled])  
 
 
-
-    return tile_id
+    return df_sp
 
 
 
@@ -214,6 +239,10 @@ def get_samples(tile_id, year):
 
 for year in YEARS:
 
+    df_samples = pd.concat([gpd.read_file(x) for x in glob('{}/{}/*'.format(PATH_SAMPLES, str(year)))])
+    df_samples = df_samples.replace(SAMPLE_REPLACE_VAL)
+    
+
     mosaic = ee.ImageCollection(ASSET_MOSAICS)\
         .filter('biome == "AMAZONIA"')\
         .filter(f'year == {year}')
@@ -222,7 +251,7 @@ for year in YEARS:
     
     for tile_id in tiles_list:
 
-        imagename = '{}_{}_{}'.format('AMAZONIA', str(year), OUTPUT_VERSION)
+        imagename = '{}-{}-{}-{}'.format('AMAZONIA', tile_id, str(year), OUTPUT_VERSION)
         
         assetId = '{}/{}'.format(ASSET_OUTPUT, imagename)
 
@@ -231,3 +260,100 @@ for year in YEARS:
         except Exception as e:
 
             samples = get_samples(tile_id, year)
+
+            # filter features
+            samples = samples[['label'] + INPUT_FEATURES + ['geometry']]
+
+
+            samples_fc = geemap.geopandas_to_ee(samples)
+            samples_fc = samples_fc.map(lambda feat: feat.select(INPUT_FEATURES + ['label']))
+
+
+            # get image
+            image = ee.Image(mosaic.filter(f'grid_name == "{tile_id}"').first())
+            image = ee.Image(image.divide(10000)).copyProperties(image)
+        
+            image = get_fractions_mosaic(image=image)
+            image = get_ndfi(image=image)
+            image = get_csfi(image=image)
+
+            # select features
+            image = ee.Image(image).select(INPUT_FEATURES)
+
+
+
+            # classify
+            classifier_prob = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
+                .setOutputMode('MULTIPROBABILITY')\
+                .train(samples_fc, 'label', INPUT_FEATURES)
+            
+            classifier = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
+                .train(samples_fc, 'label', INPUT_FEATURES)
+
+
+            # get labels for this image
+            labels_classified = samples['label'].drop_duplicates().values
+            labels_classified = [str(x) for x in labels_classified]
+
+            print(labels_classified)
+
+
+            classification = ee.Image(image
+                .classify(classifier)
+                .rename(['classification'])
+                .copyProperties(image)
+                .copyProperties(image, ['system:footprint'])
+                .copyProperties(image, ['system:time_start'])
+            )
+
+            probabilities = ee.Image(image
+                .classify(classifier_prob)
+                .rename(['probability'])
+                .copyProperties(image)
+                .copyProperties(image, ['system:footprint'])
+                .copyProperties(image, ['system:time_start'])
+            )
+
+            probabilities = probabilities\
+                .arrayProject([0])\
+                .arrayFlatten([labels_classified])\
+                .reduce(ee.Reducer.max())
+
+            probabilities = ee.Image(probabilities).multiply(100).rename('probabilities')
+
+
+
+
+            classification = classification.toByte()
+            classification = classification.set('version', OUTPUT_VERSION)
+            classification = classification.set('collection_id', 9.0)
+            classification = classification.set('biome', 'AMAZONIA')
+            classification = classification.set('territory', 'AMAZONIA')
+            classification = classification.set('source', 'Imazon')
+            probabilities = probabilities.set('tile', tile_id)
+            classification = classification.set('year', year)
+
+            probabilities = probabilities.toByte()
+            probabilities = probabilities.set('version', OUTPUT_VERSION)
+            probabilities = probabilities.set('collection_id', 9.0)
+            probabilities = probabilities.set('biome', 'AMAZONIA')
+            probabilities = probabilities.set('territory', 'AMAZONIA')
+            probabilities = probabilities.set('source', 'Imazon')
+            probabilities = probabilities.set('tile',tile_id)
+            probabilities = probabilities.set('year', year)
+
+            region = image.geometry().getInfo()['coordinates']
+
+            print(f'exporting image: {imagename}')
+
+            task = ee.batch.Export.image.toAsset(
+                image=classification.addBands(probabilities),
+                description=imagename,
+                assetId=assetId,
+                pyramidingPolicy={".default": "mode"},
+                region=region,
+                scale=10,
+                maxPixels=1e+13
+            )
+
+            task.start()
