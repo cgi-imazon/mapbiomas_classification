@@ -123,10 +123,10 @@ N_SAMPLES = 4000
 
 
 SAMPLE_PARAMS = [
-    {'label':  3, 'min_samples': N_SAMPLES * 0.20},
+    {'label':  3, 'min_samples': N_SAMPLES * 0.60},
     {'label':  4, 'min_samples': N_SAMPLES * 0.20},
     {'label': 12, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 15, 'min_samples': N_SAMPLES * 0.20},
+    {'label': 15, 'min_samples': N_SAMPLES * 0.14},
     {'label': 18, 'min_samples': N_SAMPLES * 0.10},
     {'label': 25, 'min_samples': N_SAMPLES * 0.15},
     {'label': 33, 'min_samples': N_SAMPLES * 0.15},
@@ -180,9 +180,6 @@ tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['grid_name']).get('list')
 df_reference_area = pd.read_csv(PATH_REFERENCE_AREA)
 
 
-print(len(tiles_list))
-
-exit()
 
 '''
     Functions
@@ -202,6 +199,27 @@ def get_samples(tile_id, year):
 
     df_proportion['area_p'] = df_proportion['area_ha'] / df_proportion['area_ha'].sum()
 
+    for index, row in df_proportion.iterrows():
+        n_samples_to_get = row['area_p'] * N_SAMPLES
+        
+        df_samples_year_cls = df_samples.loc[
+            (df_samples['label'] == row['classe']) &
+            (df_samples['year'] == year)
+        ]
+
+        # check existent samples
+        exist_samples = len(df_samples_year_cls)
+
+        if n_samples_to_get > exist_samples:
+            n_samples_final = 15 if exist_samples > 15 else exist_samples
+        else:
+            n_samples_final = n_samples_to_get
+
+        df_samples_sampled = df_samples_year_cls.sample(n=n_samples_final, random_state=42)
+
+        df_sp = pd.concat([df_sp, df_samples_sampled])  
+        
+    '''
     for item in SAMPLE_PARAMS:
         min_samples = int(item['min_samples'])
         label = item['label']
@@ -212,7 +230,7 @@ def get_samples(tile_id, year):
         total_samples = 0 if no_classe else int(df_proportion_classe['area_p'].values[0] * N_SAMPLES)
 
         # check if there is enought samples to use, if no, use min samples
-        n_samples_to_get = min_samples if total_samples < min_samples else total_samples
+        n_samples_to_get = total_samples
 
         df_samples_year_cls = df_samples.loc[
             (df_samples['label'] == label) &
@@ -222,14 +240,19 @@ def get_samples(tile_id, year):
         # check existent samples
         exist_samples = len(df_samples_year_cls)
 
-        n_samples_final = exist_samples if n_samples_to_get > exist_samples else n_samples_to_get
+        if n_samples_to_get > exist_samples:
+            n_samples_final = 15 if exist_samples > 15 else exist_samples
+        else:
+            n_samples_final = n_samples_to_get
+
+        print(label,n_samples_final)
 
         if n_samples_final == 0: continue
 
         df_samples_sampled = df_samples_year_cls.sample(n=n_samples_final, random_state=42)
 
         df_sp = pd.concat([df_sp, df_samples_sampled])  
-
+    '''
 
     return df_sp
 

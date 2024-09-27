@@ -2,3 +2,4 @@ venv
 data/*
 config
 sentinel/data/2023
+sentinel/data/2022
