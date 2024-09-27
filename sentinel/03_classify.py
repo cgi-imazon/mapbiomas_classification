@@ -180,6 +180,10 @@ tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['grid_name']).get('list')
 df_reference_area = pd.read_csv(PATH_REFERENCE_AREA)
 
 
+print(len(tiles_list))
+
+exit()
+
 '''
     Functions
 '''
@@ -330,7 +334,7 @@ for year in YEARS:
             classification = classification.set('biome', 'AMAZONIA')
             classification = classification.set('territory', 'AMAZONIA')
             classification = classification.set('source', 'Imazon')
-            probabilities = probabilities.set('tile', tile_id)
+            # classification = classification.set('tile', tile_id)
             classification = classification.set('year', year)
 
             probabilities = probabilities.toByte()
@@ -339,7 +343,7 @@ for year in YEARS:
             probabilities = probabilities.set('biome', 'AMAZONIA')
             probabilities = probabilities.set('territory', 'AMAZONIA')
             probabilities = probabilities.set('source', 'Imazon')
-            probabilities = probabilities.set('tile',tile_id)
+            # probabilities = probabilities.set('tile',tile_id)
             probabilities = probabilities.set('year', year)
 
             region = image.geometry().getInfo()['coordinates']
