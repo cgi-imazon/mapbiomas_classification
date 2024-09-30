@@ -33,15 +33,18 @@ ee.Initialize(project=PROJECT)
 
 PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon/sentinel'
 
-ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 
 ASSET_TILES =  'projects/mapbiomas-mosaics/assets/SENTINEL/BRAZIL/mosaics-3'
 
 ASSET_MOSAICS =  'projects/mapbiomas-mosaics/assets/SENTINEL/BRAZIL/mosaics-3'
 
 # this must be your partition raw fc samples
-ASSET_SAMPLES = 'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_col3_points_w_edge_and_edited_v2_train_LA'
+# this must be the samples of stable collection
+# ASSET_SAMPLES = 'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_col3_points_w_edge_and_edited_v2_train_LA'
+ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col3_points_w_edge_and_edited_v3'
 
+# pegar asset de 10k pts
 
 
 SENTINEL_NEW_NAMES = [
@@ -149,14 +152,18 @@ MAX_REQUESTS_PER_SECOND = 100
     Input Data
 
 '''
+roi_default = ee.FeatureCollection(ASSET_ROI).filter('Bioma == "Amazônia"')
 
-roi = ee.FeatureCollection(ASSET_ROI)
+tiles = ee.ImageCollection(ASSET_TILES)\
+    .filter(f'year == 2023')\
+    .filterBounds(roi_default.geometry())
 
-tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
+    #.filter('biome == "AMAZONIA"')\
+    
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['grid_name']).get('list').getInfo()
 
-samples = ee.FeatureCollection(ASSET_SAMPLES).filterBounds(roi.geometry())
+samples = ee.FeatureCollection(ASSET_SAMPLES).filterBounds(roi_default.geometry())
 
 print('samples ' + str(samples.size().getInfo()))
 

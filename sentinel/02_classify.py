@@ -23,7 +23,7 @@ PROJECT = 'ee-mapbiomas-imazon'
 ee.Authenticate()
 ee.Initialize(project=PROJECT)
 
-
+# https://code.earthengine.google.com/9e17ef57c5683c8c8f527d286d31715f
 
 
 
@@ -90,9 +90,9 @@ YEARS = [
     # 2018, 
     # 2019, 
     # 2020,
-    # 2021, 
-    # 2022, 
-    2023
+    2021, 
+    2022, 
+    #2023
 ]
 
 
@@ -119,17 +119,17 @@ MODEL_PARAMS = {
     # 'minLeafPopulation': 25
 }
 
-N_SAMPLES = 4000
+N_SAMPLES = 3000
 
 
 SAMPLE_PARAMS = [
     {'label':  3, 'min_samples': N_SAMPLES * 0.60},
-    {'label':  4, 'min_samples': N_SAMPLES * 0.20},
+    {'label':  4, 'min_samples': N_SAMPLES * 0.05},
     {'label': 12, 'min_samples': N_SAMPLES * 0.10},
     {'label': 15, 'min_samples': N_SAMPLES * 0.14},
     {'label': 18, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 25, 'min_samples': N_SAMPLES * 0.15},
-    {'label': 33, 'min_samples': N_SAMPLES * 0.15},
+    {'label': 25, 'min_samples': N_SAMPLES * 0.10},
+    {'label': 33, 'min_samples': N_SAMPLES * 0.10},
 ]
 
 SAMPLE_REPLACE_VAL = {
@@ -157,11 +157,37 @@ SAMPLE_REPLACE_VAL = {
         23:25,
         22:25,
         29:25,
-        24:25
+        24:25,
+
     }
 }
 
+coord = [
+    [
+      [
+        -59.482657921454425,
+        -13.429189007826484
+      ],
+      [
+        -52.780997765204425,
+        -13.429189007826484
+      ],
+      [
+        -52.780997765204425,
+        -9.359129410798744
+      ],
+      [
+        -59.482657921454425,
+        -9.359129410798744
+      ],
+      [
+        -59.482657921454425,
+        -13.429189007826484
+      ]
+    ]
+]
 
+geo_roi = ee.Geometry.Polygon(coord)
 
 '''
 
@@ -174,10 +200,13 @@ roi = ee.FeatureCollection(ASSET_ROI)
 tiles = ee.ImageCollection(ASSET_TILES)\
     .filter('biome == "AMAZONIA"')\
     .filter(f'year == 2023')
+    #.filterBounds(geo_roi)
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['grid_name']).get('list').getInfo()
 
-df_reference_area = pd.read_csv(PATH_REFERENCE_AREA)
+df_reference_area = pd.read_csv(PATH_REFERENCE_AREA).replace({
+    'classe': SAMPLE_REPLACE_VAL['label']
+})
 
 
 
@@ -190,6 +219,15 @@ df_reference_area = pd.read_csv(PATH_REFERENCE_AREA)
 
 def get_samples(tile_id, year):
 
+    # SC-22-X-C
+    number_row = tile_id[3:5]
+
+    tiles_id_arround = [
+        tile_id, 
+        tile_id.replace(number_row, str(int(number_row) + 1)),
+        tile_id.replace(number_row, str(int(number_row) - 1)),
+    ]
+
     df_sp = pd.DataFrame([])
 
     df_proportion = df_reference_area.loc[
@@ -199,26 +237,33 @@ def get_samples(tile_id, year):
 
     df_proportion['area_p'] = df_proportion['area_ha'] / df_proportion['area_ha'].sum()
 
+    
     for index, row in df_proportion.iterrows():
+
         n_samples_to_get = row['area_p'] * N_SAMPLES
         
         df_samples_year_cls = df_samples.loc[
             (df_samples['label'] == row['classe']) &
-            (df_samples['year'] == year)
+            (df_samples['year'] == year) &
+            (df_samples['grid_name'].isin(tiles_id_arround))
         ]
 
         # check existent samples
         exist_samples = len(df_samples_year_cls)
 
         if n_samples_to_get > exist_samples:
-            n_samples_final = 15 if exist_samples > 15 else exist_samples
+            n_samples_final = exist_samples
         else:
             n_samples_final = n_samples_to_get
 
-        df_samples_sampled = df_samples_year_cls.sample(n=n_samples_final, random_state=42)
+        df_samples_sampled = df_samples_year_cls.sample(n=int(n_samples_final), random_state=42)
+
+        print(row['classe'], int(n_samples_final))
 
         df_sp = pd.concat([df_sp, df_samples_sampled])  
-        
+
+    
+    
     '''
     for item in SAMPLE_PARAMS:
         min_samples = int(item['min_samples'])
@@ -253,6 +298,15 @@ def get_samples(tile_id, year):
 
         df_sp = pd.concat([df_sp, df_samples_sampled])  
     '''
+    
+
+    df_sp = pd.concat([df_sp, df_samples.query('label == 33').sample(n=5)]) 
+    df_sp = pd.concat([df_sp, df_samples.query('label == 25').sample(n=5)]) 
+    df_sp = pd.concat([df_sp, df_samples.query('label == 18').sample(n=8)]) 
+    df_sp = pd.concat([df_sp, df_samples.query('label == 12').sample(n=15)]) 
+    df_sp = pd.concat([df_sp, df_samples.query('label == 4').sample(n=8)]) 
+    df_sp = pd.concat([df_sp, df_samples.query('label == 11').sample(n=8)]) 
+
 
     return df_sp
 
@@ -268,6 +322,8 @@ for year in YEARS:
 
     df_samples = pd.concat([gpd.read_file(x) for x in glob('{}/{}/*'.format(PATH_SAMPLES, str(year)))])
     df_samples = df_samples.replace(SAMPLE_REPLACE_VAL)
+
+    print('samples water', df_samples.query('label == 3').shape)
     
 
     mosaic = ee.ImageCollection(ASSET_MOSAICS)\
