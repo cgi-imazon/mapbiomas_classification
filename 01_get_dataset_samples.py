@@ -38,7 +38,7 @@ ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
 # this must be your partition raw fc samples
-ASSET_SAMPLES = 'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_col3_points_w_edge_and_edited_v2_train_LA'
+ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col4_points_w_edge_and_edited_v1'
 
 
 
@@ -170,7 +170,9 @@ tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 
-samples = ee.FeatureCollection(ASSET_SAMPLES).filterBounds(roi.geometry())
+samples = ee.FeatureCollection(ASSET_SAMPLES)\
+    .filter('AMOSTRAS == "Treinamento"')\
+    .filterBounds(roi)
 
 print('samples ' + str(samples.size().getInfo()))
 

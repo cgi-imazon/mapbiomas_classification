@@ -143,3 +143,52 @@ def remove_cloud_s2(collection: ee.imagecollection.ImageCollection) -> ee.imagec
         )
     
     return colFreeCloud
+
+
+
+def get_segments(image, size=30) -> ee.image.Image:
+
+    seeds = ee.Algorithms.Image.Segmentation.seedGrid(
+        size=size,
+        gridType='square'
+    )
+
+    snic = ee.Algorithms.Image.Segmentation.SNIC(
+        image=image,
+        size=size,
+        compactness=1,
+        connectivity=8,
+        neighborhoodSize=2*size,
+        seeds=seeds
+    )
+
+    # snic = ee.Image(
+    #     snic.copyProperties(ee.Image(image))
+    #         .copyProperties(ee.Image(image), ['system:footprint'])
+    #         .copyProperties(ee.Image(image), ['system:time_start']))
+
+    snic = ee.Image(snic).copyProperties(ee.Image(image))
+
+    return ee.Image(snic).select(['clusters'], ['segments'])
+
+
+def get_similar_mask(segments, samples_harmonized, prop):
+
+    samples_segments = segments.sampleRegions(
+        collection=samples_harmonized,
+        scale=10,
+        properties=[prop],
+    )
+
+    segments_values = ee.List(
+        samples_segments
+        .reduceColumns(ee.Reducer.toList().repeat(2),[prop, 'segments']).get('list')
+    )   
+
+    similiar_mask = segments.remap(
+        segments_values.get(1),
+        segments_values.get(0), 
+        0
+    )
+
+    return similiar_mask.rename([prop])

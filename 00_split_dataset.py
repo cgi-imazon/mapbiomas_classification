@@ -25,7 +25,7 @@ ee.Initialize(project=PROJECT)
 ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
 # this must be your partition raw fc samples
-ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col3_points_w_edge_and_edited_v3'
+ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col4_points_w_edge_and_edited_v1'
 ASSET_OUTPUT = 'projects/imazon-simex/LULC/COLLECTION9/SAMPLES'
 
 
@@ -48,7 +48,9 @@ INPUT_FEATURES = [
 
 roi = ee.FeatureCollection(ASSET_ROI)
 
-samples = ee.FeatureCollection(ASSET_SAMPLES).filterBounds(roi)
+samples = ee.FeatureCollection(ASSET_SAMPLES)\
+    .filter('AMOSTRAS == "Treinamento"')\
+    .filterBounds(roi)
 
 
 '''
