@@ -260,9 +260,9 @@ def get_dataset(tile_id: str):
 
     roi = tile_image.geometry()
 
-    region = roi.getInfo()['coordinates']
+    # region = roi.getInfo()['coordinates']
 
-    center = roi.centroid()
+    # center = roi.centroid()
 
     samples_harmonized_tile = samples_harmonized.filterBounds(roi)
     samples_harmonized_tile_inf = samples_harmonized_tile.getInfo()
@@ -392,6 +392,8 @@ for year in YEARS:
     # check if dir exists
     if not os.path.exists(f'{PATH_DIR}/data/{str(year)}'):
         os.makedirs(f'{PATH_DIR}/data/{str(year)}')
+
+    
 
     
     for tile_id in tiles_list:
