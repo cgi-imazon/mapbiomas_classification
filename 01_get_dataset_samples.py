@@ -13,10 +13,6 @@ import threading
 from utils.helpers import *
 from pprint import pprint
 
-#service_account = 'sad-deep-learning-274812@appspot.gserviceaccount.com'
-#credentials = ee.ServiceAccountCredentials(service_account, 'config/account-sad-deep-learning.json')
-
-#ee.Initialize(credentials)
 
 PROJECT = 'ee-mapbiomas-imazon'
 #PROJECT = 'mapbiomas'
@@ -36,6 +32,9 @@ PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
+
+ASSET_LULC = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas_collection90_integration_v1'
+
 
 # this must be your partition raw fc samples
 ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col4_points_w_edge_and_edited_v1'
@@ -120,11 +119,57 @@ INPUT_FEATURES = [
 
 
 
+# used to calculate stable areas
+YEARS_STABLE = [
+    # 2000, 2001, 2002, 2003, 2004, 2005,
+    # 2006, 2007, 2008, 2009, 2010, 2011,
+    2012, 2013, 2014, 2015, 2016, 2017,
+    2018, 2019, 2020, 2021, 2022, 2023
+]
+
+BANDS_STABLE = list(map(lambda y: f'classification_{str(y)}', YEARS_STABLE))
+
+
 '''
 
     Harmonize classes from dataset samples
 
 '''
+
+SAMPLE_REPLACE_VAL = {
+    'label':{
+        3:3,
+        6:3,
+        5:3,
+
+        19:18,
+        39:18,
+        20:18,
+        40:18,
+        62:18,
+        41:18,
+        
+        36: 3,
+
+        46: 18, # coffe
+        47: 18, # citrus
+        35: 18, # palm oil
+        48: 18, # other perennial crops
+
+        9:3,
+
+        30:25,
+        23:25,
+        22:25,
+        29:25,
+        24:25,
+
+
+        15: 15,
+        33: 33
+
+    }
+}
 
 HARMONIZATION_CLASSES_SAMPLES = {
     "AFLORAMENTO ROCHOSO": 25,
@@ -176,6 +221,31 @@ samples = ee.FeatureCollection(ASSET_SAMPLES)\
 
 print('samples ' + str(samples.size().getInfo()))
 
+
+
+
+
+
+
+'''
+    Get Stable Areas
+'''
+
+
+from_vals = [int(x) for x in list(SAMPLE_REPLACE_VAL['label'].keys())]
+to_vals = list(SAMPLE_REPLACE_VAL['label'].values())
+
+
+lulc = ee.Image(ASSET_LULC).select(BANDS_STABLE)
+
+count_runs = lulc.reduce(ee.Reducer.countRuns())
+
+stable = ee.Image(lulc.select('classification_2023').updateMask(count_runs.eq(1)))
+
+stable = ee.Image(stable).remap(from_vals, to_vals, 0).rename('stable')
+
+
+
 '''
     
     Function to Export
@@ -193,6 +263,46 @@ def get_dataset(image_id: str):
         return None
 
     image = ee.Image(images.filter(f'LANDSAT_SCENE_ID == "{image_id}"').first())
+
+
+
+
+
+
+    stable_grid = stable.clip(roi)
+
+    # get segments
+    segments = get_segments(ee.Image(image).select(['red', 'green', 'blue', 'swir1', 'swir2']))
+
+    segments = ee.Image(segments).reproject('EPSG:4326', None, 30)
+
+    similar_mask = ee.Image(get_similar_mask(segments, samples_harmonized, 'label').selfMask())
+    
+
+    # redução de componentes conectados com percentil 5 e 95
+    percentil = segments.addBands(stable_grid, ['stable']).reduceConnectedComponents(
+        ee.Reducer.percentile([5, 95]), 'segments'
+    )
+
+    # redução de componentes conectados com o modo
+    validated = segments.addBands(stable_grid, ['stable']).reduceConnectedComponents(
+        ee.Reducer.mode(), 'segments'
+    )
+
+
+    # multiplica onde os percentis 5 e 95 são iguais a 1
+    validated = validated.multiply(
+        percentil.select(0).eq(percentil.select(1)).eq(1)
+    )
+
+    # similar_mask_validated = similar_mask.mask(similar_mask.eq(validated)).rename('label')
+    similar_mask_validated = similar_mask.updateMask(similar_mask.eq(validated)).rename('label')
+
+
+
+
+
+
     
     image = get_fractions(image=image)
     image = get_ndfi(image=image)
@@ -202,6 +312,12 @@ def get_dataset(image_id: str):
     image = ee.Image(image).select(INPUT_FEATURES + ['red', 'green', 'blue', 'swir1'])
 
 
+
+
+
+    
+
+
     # get features
     samples_image = image.sampleRegions(
         collection = samples_harmonized_tile, 
@@ -209,15 +325,31 @@ def get_dataset(image_id: str):
         geometries = True
     )
 
+    samples_segments = image.addBands(similar_mask_validated.selfMask()).sample(
+        region=roi,
+        scale=30,
+        factor=0.003,  # Define o fator de amostragem
+        dropNulls=True,
+        geometries=True
+    )
+
+
+
+
     # set properties
     samples_image = samples_image.map(lambda feat: feat.copyProperties(image))
     samples_image = samples_image.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))
     samples_image = samples_image.map(lambda feat: feat.set('tile', tile))
 
+    samples_segments = samples_segments.map(lambda feat: ee.Feature(feat).copyProperties(image))
+    samples_segments = samples_segments.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))#.filter(ee.Filter.neq('label', 0))
+    samples_segments = samples_segments.map(lambda feat: feat.set('tile', tile))
+
+    samples_final = samples_image.merge(samples_segments)
 
     # convert to geodataframe
     samples_image_gdf = ee.data.computeFeatures({
-        'expression': samples_image,
+        'expression': samples_final,
         'fileFormat': 'GEOPANDAS_GEODATAFRAME'
     })
 

@@ -227,8 +227,7 @@ BANDS_STABLE = list(map(lambda y: f'classification_{str(y)}', YEARS_STABLE))
 
 
 
-from_vals = list(SAMPLE_REPLACE_VAL['label'].keys())
-from_vals = [int(x) for x in from_vals]
+from_vals = [int(x) for x in list(SAMPLE_REPLACE_VAL['label'].keys())]
 to_vals = list(SAMPLE_REPLACE_VAL['label'].values())
 
 
