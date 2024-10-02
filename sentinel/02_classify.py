@@ -322,8 +322,6 @@ for year in YEARS:
 
     df_samples = pd.concat([gpd.read_file(x) for x in glob('{}/{}/*'.format(PATH_SAMPLES, str(year)))])
     df_samples = df_samples.replace(SAMPLE_REPLACE_VAL)
-
-    print('samples water', df_samples.query('label == 3').shape)
     
 
     mosaic = ee.ImageCollection(ASSET_MOSAICS)\
