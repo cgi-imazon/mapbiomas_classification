@@ -116,6 +116,7 @@ SEGMENT_BANDS = [
 
 SAMPLE_REPLACE_VAL = {
     'label':{
+        3:3,
         6:3,
         5:3,
 
@@ -140,6 +141,10 @@ SAMPLE_REPLACE_VAL = {
         22:25,
         29:25,
         24:25,
+
+
+        15: 15,
+        33: 33
 
     }
 }
@@ -224,9 +229,7 @@ BANDS_STABLE = list(map(lambda y: f'classification_{str(y)}', YEARS_STABLE))
 
 from_vals = list(SAMPLE_REPLACE_VAL['label'].keys())
 from_vals = [int(x) for x in from_vals]
-
 to_vals = list(SAMPLE_REPLACE_VAL['label'].values())
-
 
 
 lulc = ee.Image(ASSET_LULC).select(BANDS_STABLE)
@@ -294,33 +297,14 @@ def get_dataset(tile_id: str):
             ee.Reducer.mode(), 'segments'
         )
 
-        
-
-
 
         # multiplica onde os percentis 5 e 95 são iguais a 1
-        validated = validated.multiply(percentil.select(0).eq(percentil.select(1)).eq(1))
-
-        
-
+        validated = validated.multiply(
+            percentil.select(0).eq(percentil.select(1)).eq(1)
+        )
 
         # similar_mask_validated = similar_mask.mask(similar_mask.eq(validated)).rename('label')
         similar_mask_validated = similar_mask.updateMask(similar_mask.eq(validated)).rename('label')
-
-
-        t = ee.batch.Export.image.toAsset(
-            image=validated,
-            description=tile_id,
-            assetId=f'projects/ee-simex/assets/validated_{tile_id}',
-            pyramidingPolicy={".default": "mode"},
-            region=region,
-            scale=30,
-            maxPixels=1e+13
-        )
-
-        t.start()
-        
-
 
 
         image = get_fractions_mosaic(image=image)
@@ -349,17 +333,17 @@ def get_dataset(tile_id: str):
             geometries=True
         )
 
-        
-        print(samples_segments.aggregate_histogram('label').getInfo())
-
         # set properties
-        # samples_image = samples_image.map(lambda feat: feat.copyProperties(image))
-        # samples_image = samples_image.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))
+        samples_image = samples_image.map(lambda feat: feat.copyProperties(image))
+        samples_image = samples_image.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))
         # samples_image = samples_image.map(lambda feat: feat.set('tile', tile_id))
 
 
         samples_segments = samples_segments.map(lambda feat: ee.Feature(feat).copyProperties(image))
         samples_segments = samples_segments.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))#.filter(ee.Filter.neq('label', 0))
+        
+        samples_final = samples_image.merge(samples_segments)
+
         # samples_segments = samples_segments.map(lambda feat: feat.set('tile', tile_id))
 
         # convert to geodataframe
@@ -369,7 +353,7 @@ def get_dataset(tile_id: str):
         # })
 
         samples_image_seg_gdf = ee.data.computeFeatures({
-            'expression': samples_segments,
+            'expression': samples_final,
             'fileFormat': 'GEOPANDAS_GEODATAFRAME'
         })
 
@@ -410,7 +394,7 @@ for year in YEARS:
         os.makedirs(f'{PATH_DIR}/data/{str(year)}')
 
     
-    for tile_id in tiles_list[2:5]:
+    for tile_id in tiles_list:
 
 
         samples_image_gdf = get_dataset(tile_id)
