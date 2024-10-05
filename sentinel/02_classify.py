@@ -23,8 +23,8 @@ PROJECT = 'ee-mapbiomas-imazon'
 ee.Authenticate()
 ee.Initialize(project=PROJECT)
 
-# https://code.earthengine.google.com/9e17ef57c5683c8c8f527d286d31715f
-
+# https://code.earthengine.google.com/18407811802803ecb04f05a60c831d58
+# https://code.earthengine.google.com/e00f2d90d9546e207cd137e6b9e00eb0
 
 
 '''
@@ -43,7 +43,7 @@ ASSET_MOSAICS =  'projects/mapbiomas-mosaics/assets/SENTINEL/BRAZIL/mosaics-3'
 
 PATH_SAMPLES = '{}/data'.format(PATH_DIR)
 
-PATH_REFERENCE_AREA = '{}/data/area/area_lulc_s2.csv'.format(PATH_DIR)
+PATH_REFERENCE_AREA = '{}/data/area/area_lulc_v2.csv'.format(PATH_DIR)
 
 ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/lulc/sentinel/classification'
 
@@ -90,9 +90,9 @@ YEARS = [
     # 2018, 
     # 2019, 
     # 2020,
-    2021, 
-    2022, 
-    #2023
+    # 2021, 
+    # 2022, 
+    2023
 ]
 
 
@@ -108,7 +108,7 @@ INPUT_FEATURES = [
 ]
 
 
-OUTPUT_VERSION = '1'
+OUTPUT_VERSION = '2'
 
 
 
@@ -122,15 +122,16 @@ MODEL_PARAMS = {
 N_SAMPLES = 3000
 
 
-SAMPLE_PARAMS = [
-    {'label':  3, 'min_samples': N_SAMPLES * 0.60},
-    {'label':  4, 'min_samples': N_SAMPLES * 0.05},
-    {'label': 12, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 15, 'min_samples': N_SAMPLES * 0.14},
-    {'label': 18, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 25, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 33, 'min_samples': N_SAMPLES * 0.10},
-]
+SAMPLE_PARAMS = {
+    3: 500,
+    4: 100,
+    12: 120,
+    15: 200,
+    18: 200,
+    25: 150,
+    33: 100,
+    11: 100,
+}
 
 SAMPLE_REPLACE_VAL = {
     'label':{
@@ -159,35 +160,19 @@ SAMPLE_REPLACE_VAL = {
         29:25,
         24:25,
 
+        31: 33,
+        32: 25,
+        21: 15
+
     }
 }
 
 coord = [
-    [
-      [
-        -59.482657921454425,
-        -13.429189007826484
-      ],
-      [
-        -52.780997765204425,
-        -13.429189007826484
-      ],
-      [
-        -52.780997765204425,
-        -9.359129410798744
-      ],
-      [
-        -59.482657921454425,
-        -9.359129410798744
-      ],
-      [
-        -59.482657921454425,
-        -13.429189007826484
-      ]
-    ]
+    -54.89831183203141,
+    -2.4850787331932724
 ]
 
-geo_roi = ee.Geometry.Polygon(coord)
+geo_roi = ee.Geometry.Point(coord)
 
 '''
 
@@ -200,7 +185,6 @@ roi = ee.FeatureCollection(ASSET_ROI)
 tiles = ee.ImageCollection(ASSET_TILES)\
     .filter('biome == "AMAZONIA"')\
     .filter(f'year == 2023')
-    #.filterBounds(geo_roi)
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['grid_name']).get('list').getInfo()
 
@@ -208,6 +192,10 @@ df_reference_area = pd.read_csv(PATH_REFERENCE_AREA).replace({
     'classe': SAMPLE_REPLACE_VAL['label']
 })
 
+df_reference_area = df_reference_area.query('classe != 0')
+df_reference_area = df_reference_area.groupby(by=['classe', 'grid_name', 'year'])['area_ha'].sum().reset_index()
+
+print(df_reference_area.head())
 
 
 '''
@@ -222,12 +210,6 @@ def get_samples(tile_id, year):
     # SC-22-X-C
     number_row = tile_id[3:5]
 
-    tiles_id_arround = [
-        tile_id, 
-        tile_id.replace(number_row, str(int(number_row) + 1)),
-        tile_id.replace(number_row, str(int(number_row) - 1)),
-    ]
-
     df_sp = pd.DataFrame([])
 
     df_proportion = df_reference_area.loc[
@@ -237,75 +219,28 @@ def get_samples(tile_id, year):
 
     df_proportion['area_p'] = df_proportion['area_ha'] / df_proportion['area_ha'].sum()
 
-    
-    for index, row in df_proportion.iterrows():
+    print(df_proportion)
 
-        n_samples_to_get = row['area_p'] * N_SAMPLES
+    
+    for key, val in SAMPLE_PARAMS.items():
         
-        df_samples_year_cls = df_samples.loc[
-            (df_samples['label'] == row['classe']) &
-            (df_samples['year'] == year) &
-            (df_samples['grid_name'].isin(tiles_id_arround))
-        ]
+        n_samples_proportion = df_proportion.loc[df_proportion['classe'] == key, 'area_p'].values[0] * N_SAMPLES
+        n_samples_min = val
+        n_samples_exist = len(df_samples.loc[(df_samples['year'] == year) & (df_samples['label'] == key)])
 
-        # check existent samples
-        exist_samples = len(df_samples_year_cls)
+        n_samples_final = 0
 
-        if n_samples_to_get > exist_samples:
-            n_samples_final = exist_samples
-        else:
-            n_samples_final = n_samples_to_get
+        if n_samples_proportion > n_samples_min:
+            n_samples_final = n_samples_proportion
+        elif n_samples_proportion < n_samples_min:
+            n_samples_final = n_samples_min
+        
+        if n_samples_final < n_samples_exist: n_samples_exist
+        if n_samples_final == 0: continue 
 
-        df_samples_sampled = df_samples_year_cls.sample(n=int(n_samples_final), random_state=42)
+        df_samples_get = df_samples.sample(n=int(n_samples_final))
 
-        print(row['classe'], int(n_samples_final))
-
-        df_sp = pd.concat([df_sp, df_samples_sampled])  
-
-    
-    
-    '''
-    for item in SAMPLE_PARAMS:
-        min_samples = int(item['min_samples'])
-        label = item['label']
-
-        df_proportion_classe = df_proportion.loc[df_proportion['classe'] == label]
-        no_classe = len(df_proportion_classe) == 0
-
-        total_samples = 0 if no_classe else int(df_proportion_classe['area_p'].values[0] * N_SAMPLES)
-
-        # check if there is enought samples to use, if no, use min samples
-        n_samples_to_get = total_samples
-
-        df_samples_year_cls = df_samples.loc[
-            (df_samples['label'] == label) &
-            (df_samples['year'] == year)
-        ]
-
-        # check existent samples
-        exist_samples = len(df_samples_year_cls)
-
-        if n_samples_to_get > exist_samples:
-            n_samples_final = 15 if exist_samples > 15 else exist_samples
-        else:
-            n_samples_final = n_samples_to_get
-
-        print(label,n_samples_final)
-
-        if n_samples_final == 0: continue
-
-        df_samples_sampled = df_samples_year_cls.sample(n=n_samples_final, random_state=42)
-
-        df_sp = pd.concat([df_sp, df_samples_sampled])  
-    '''
-    
-
-    df_sp = pd.concat([df_sp, df_samples.query('label == 33').sample(n=5)]) 
-    df_sp = pd.concat([df_sp, df_samples.query('label == 25').sample(n=5)]) 
-    df_sp = pd.concat([df_sp, df_samples.query('label == 18').sample(n=8)]) 
-    df_sp = pd.concat([df_sp, df_samples.query('label == 12').sample(n=15)]) 
-    df_sp = pd.concat([df_sp, df_samples.query('label == 4').sample(n=8)]) 
-    df_sp = pd.concat([df_sp, df_samples.query('label == 11').sample(n=8)]) 
+        df_sp = pd.concat([df_sp, df_samples_get])  
 
 
     return df_sp

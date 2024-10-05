@@ -86,10 +86,10 @@ YEARS = [
     # 2017, 
     # 2018, 
     # 2019, 
-    # 2020,
-    # 2021, 
-    # 2022, 
-    2023
+    2020,
+    2021, 
+    2022, 
+    # 2023
 ]
 
 
@@ -219,7 +219,7 @@ print('samples ' + str(samples.size().getInfo()))
 YEARS_STABLE = [
     # 2000, 2001, 2002, 2003, 2004, 2005,
     # 2006, 2007, 2008, 2009, 2010, 2011,
-    2012, 2013, 2014, 2015, 2016, 2017,
+    # 2012, 2013, 2014, 2015, 2016, 2017,
     2018, 2019, 2020, 2021, 2022, 2023
 ]
 
@@ -260,16 +260,7 @@ def get_dataset(tile_id: str):
 
     roi = tile_image.geometry()
 
-    # region = roi.getInfo()['coordinates']
-
-    # center = roi.centroid()
-
     samples_harmonized_tile = samples_harmonized.filterBounds(roi)
-    samples_harmonized_tile_inf = samples_harmonized_tile.getInfo()
-
-    print('sp/tile', len(samples_harmonized_tile_inf['features']))
-
-    if len(samples_harmonized_tile_inf['features']) == 0: return None, None
 
     try:
         image = ee.Image(mosaic.filter(f'grid_name == "{tile_id}"').first())
@@ -342,15 +333,10 @@ def get_dataset(tile_id: str):
         samples_segments = samples_segments.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))#.filter(ee.Filter.neq('label', 0))
         # samples_segments = samples_segments.map(lambda feat: feat.set('tile', tile_id))
 
-        samples_final = samples_image.merge(samples_segments)
-
-        
-
-        # convert to geodataframe
-        # samples_image_gdf = ee.data.computeFeatures({
-        #     'expression': samples_image,
-        #     'fileFormat': 'GEOPANDAS_GEODATAFRAME'
-        # })
+        if samples_image.size().getInfo() > 0:
+            samples_final = samples_image.merge(samples_segments)
+        else:
+            samples_final = samples_image
 
         samples_image_seg_gdf = ee.data.computeFeatures({
             'expression': samples_final,
@@ -414,20 +400,6 @@ for year in YEARS:
             print(e)
             continue
     
-
-
-
-    # export_dataset(tiles_list, year)
-
-
-    
-
-
-
-
-
-
-
 
 
 
