@@ -222,8 +222,6 @@ tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 
-print(tiles_list)
-
 samples = ee.FeatureCollection(ASSET_SAMPLES)\
     .filterBounds(roi)
     #.filter('AMOSTRAS == "Treinamento"')\

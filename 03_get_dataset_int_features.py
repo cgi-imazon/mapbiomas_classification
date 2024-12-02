@@ -14,10 +14,6 @@ from utils.helpers import *
 from pprint import pprint
 from glob import glob
 
-#service_account = 'sad-deep-learning-274812@appspot.gserviceaccount.com'
-#credentials = ee.ServiceAccountCredentials(service_account, 'config/account-sad-deep-learning.json')
-
-#ee.Initialize(credentials)
 
 PROJECT = 'sad-deep-learning-274812'
 
@@ -34,13 +30,12 @@ ee.Initialize(project=PROJECT)
 
 PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 
-PATH_LOGFILE = f'{PATH_DIR}/data/log_dataset_integrated.csv'
-
-ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+# ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
-ASSET_CLASSIFICATION = 'projects/imazon-simex/LULC/LEGAL_AMAZON/classification'
+ASSET_CLASSIFICATION = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification'
 
 ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/features-int'
 
