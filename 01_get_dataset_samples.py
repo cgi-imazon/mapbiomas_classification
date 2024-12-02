@@ -29,7 +29,8 @@ ee.Initialize(project=PROJECT)
 
 PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 
-ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+# ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
@@ -38,7 +39,7 @@ ASSET_LULC = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas
 
 # this must be your partition raw fc samples
 ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col4_points_w_edge_and_edited_v1'
-
+# ASSET_SAMPLES =  'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_col3_points_w_edge_and_edited_v2_train_LA'
 
 
 LANDSAT_NEW_NAMES = [
@@ -88,7 +89,8 @@ YEARS = [
     # 2000, 2001, 2002,
     # 2003, 2004, 
     # 2005, 2006, 2007, 2008,
-    # 2009, 2010, 
+    # 2009, 
+    # 2010, 
     # 2011, 
     # 2012, 
     # 2013, 
@@ -101,7 +103,8 @@ YEARS = [
     # 2020,
     # 2021, 
     # 2022, 
-    2023
+    # 2023
+    2024
 ]
 
 
@@ -166,7 +169,10 @@ SAMPLE_REPLACE_VAL = {
 
 
         15: 15,
-        33: 33
+        33: 33,
+
+        4:4,
+        12:12
 
     }
 }
@@ -198,7 +204,7 @@ HARMONIZATION_CLASSES_SAMPLES = {
 }
 
 
-EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=40)
+EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=30)
 MAX_REQUESTS_PER_SECOND = 100
 
 
@@ -209,15 +215,19 @@ MAX_REQUESTS_PER_SECOND = 100
 
 '''
 
-roi = ee.FeatureCollection(ASSET_ROI)
+roi = ee.FeatureCollection(ASSET_ROI)\
+    .filter('Bioma == "Amazônia"'); 
 
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 
+print(tiles_list)
+
 samples = ee.FeatureCollection(ASSET_SAMPLES)\
-    .filter('AMOSTRAS == "Treinamento"')\
     .filterBounds(roi)
+    #.filter('AMOSTRAS == "Treinamento"')\
+    
 
 print('samples ' + str(samples.size().getInfo()))
 
@@ -245,7 +255,6 @@ stable = ee.Image(lulc.select('classification_2023').updateMask(count_runs.eq(1)
 stable = ee.Image(stable).remap(from_vals, to_vals, 0).rename('stable')
 
 
-
 '''
     
     Function to Export
@@ -265,10 +274,6 @@ def get_dataset(image_id: str):
     image = ee.Image(images.filter(f'LANDSAT_SCENE_ID == "{image_id}"').first())
 
 
-
-
-
-
     stable_grid = stable.clip(roi)
 
     # get segments
@@ -276,7 +281,11 @@ def get_dataset(image_id: str):
 
     segments = ee.Image(segments).reproject('EPSG:4326', None, 30)
 
-    similar_mask = ee.Image(get_similar_mask(segments, samples_harmonized, 'label').selfMask())
+    similar_mask = get_similar_mask(segments, samples_harmonized_tile, 'label')
+
+    if not similar_mask: return None
+
+    similar_mask = ee.Image(similar_mask.selfMask())
     
 
     # redução de componentes conectados com percentil 5 e 95
@@ -310,6 +319,7 @@ def get_dataset(image_id: str):
 
     # select features
     image = ee.Image(image).select(INPUT_FEATURES + ['red', 'green', 'blue', 'swir1'])
+    # image = ee.Image(image).select(INPUT_FEATURES)
 
 
 
@@ -328,12 +338,11 @@ def get_dataset(image_id: str):
     samples_segments = image.addBands(similar_mask_validated.selfMask()).sample(
         region=roi,
         scale=30,
-        factor=0.003,  # Define o fator de amostragem
+        numPixels=15,
+        #factor=0.003,  # Define o fator de amostragem
         dropNulls=True,
         geometries=True
     )
-
-
 
 
     # set properties
@@ -395,6 +404,7 @@ for year in YEARS:
 
     # harmonization classes for dataset samples
     year_sample = 'CLASS_' + str(year) if year <= 2022 else 'CLASS_2022'
+
   
     samples_harmonized = samples.select(year_sample).remap(
         ee.Dictionary(HARMONIZATION_CLASSES_SAMPLES).keys(), 
@@ -402,6 +412,7 @@ for year in YEARS:
         year_sample
     ).select([year_sample], ['label'])
 
+    
 
     for tile in tiles_list:
 
@@ -420,7 +431,7 @@ for year in YEARS:
 
         samples_harmonized_tile = samples_harmonized.filterBounds(roi)
 
-
+        if samples_harmonized_tile.size().getInfo() == 0: continue
 
         # get landsat images by roi
         l5 = (
@@ -480,7 +491,6 @@ for year in YEARS:
         image_list = images.reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
 
         print(f'n images {len(image_list)}')
-
 
         export_dataset(image_list, year, tile)
 

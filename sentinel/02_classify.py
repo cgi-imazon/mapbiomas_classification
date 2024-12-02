@@ -23,8 +23,7 @@ PROJECT = 'ee-mapbiomas-imazon'
 ee.Authenticate()
 ee.Initialize(project=PROJECT)
 
-# https://code.earthengine.google.com/18407811802803ecb04f05a60c831d58
-# https://code.earthengine.google.com/e00f2d90d9546e207cd137e6b9e00eb0
+# https://code.earthengine.google.com/a639633f12cf995fb8f8f41afcdd9175
 
 
 '''
@@ -49,24 +48,24 @@ ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/lulc/sentinel/classification
 
 
 
-SENTINEL_NEW_NAMES = [
-    'blue',
-    'green',
-    'red',
-    'red_edge_1',
-    'nir',
-    'swir1',
-    'swir2',
-    'pixel_qa'
-]
+# SENTINEL_NEW_NAMES = [
+#     'blue',
+#     'green',
+#     'red',
+#     'red_edge_1',
+#     'nir',
+#     'swir1',
+#     'swir2',
+#     'pixel_qa'
+# ]
 
-ASSET_IMAGES = {
-    's2':{
-        'idCollection': '',
-        'bandNames': ['B2', 'B3', 'B4', 'B5', 'B8', 'B11', 'B12', 'QA60'],
-        'newBandNames': SENTINEL_NEW_NAMES,
-    }
-}
+# ASSET_IMAGES = {
+#     's2':{
+#         'idCollection': '',
+#         'bandNames': ['B2', 'B3', 'B4', 'B5', 'B8', 'B11', 'B12', 'QA60'],
+#         'newBandNames': SENTINEL_NEW_NAMES,
+#     }
+# }
 
 
 
@@ -91,46 +90,89 @@ YEARS = [
     # 2019, 
     # 2020,
     # 2021, 
-    # 2022, 
-    2023
+    2022, 
+    # 2023
 ]
 
 
 
 INPUT_FEATURES = [
-    'gv', 
-    'npv', 
-    'soil', 
-    'cloud',
-    'gvs',
-    'ndfi', 
-    'csfi'
+    # 'gv', 
+    # 'npv', 
+    # 'soil', 
+    # 'cloud',
+    # 'gvs',
+    # 'ndfi', 
+    # 'csfi',
+    "blue_median",
+    "blue_median_wet",
+    "blue_median_dry",
+    "blue_stdDev",
+    "green_median",
+    "green_median_dry",
+    "green_median_wet",
+    "green_median_texture",
+    "green_min",
+    "green_stdDev",
+    "red_median",
+    "red_median_dry",
+    "red_min",
+    "red_median_wet",
+    "red_stdDev",
+    "nir_median",
+    "nir_median_dry",
+    "nir_median_wet",
+    "nir_stdDev",
+    "red_edge_1_median",
+    "red_edge_1_median_dry",
+    "red_edge_1_median_wet",
+    "red_edge_1_stdDev",
+    "red_edge_2_median",
+    "red_edge_2_median_dry",
+    "red_edge_2_median_wet",
+    "red_edge_2_stdDev",
+    "red_edge_3_median",
+    "red_edge_3_median_dry",
+    "red_edge_3_median_wet",
+    "red_edge_3_stdDev",
+    "red_edge_4_median",
+    "red_edge_4_median_dry",
+    "red_edge_4_median_wet",
+    "red_edge_4_stdDev",
+    "swir1_median",
+    "swir1_median_dry",
+    "swir1_median_wet",
+    "swir1_stdDev",
+    "swir2_median",
+    "swir2_median_wet",
+    "swir2_median_dry",
+    "swir2_stdDev"
 ]
 
 
-OUTPUT_VERSION = '2'
+OUTPUT_VERSION = '8'
 
 
 
 
 MODEL_PARAMS = {
     'numberOfTrees': 50,
-    # 'variablesPerSplit': 4,
-    # 'minLeafPopulation': 25
+    #'variablesPerSplit': 4,
+    #'minLeafPopulation': 20
 }
 
-N_SAMPLES = 3000
+N_SAMPLES = 4000
 
 
 SAMPLE_PARAMS = {
-    3: 500,
-    4: 100,
-    12: 120,
-    15: 200,
-    18: 200,
-    25: 150,
-    33: 100,
-    11: 100,
+    3: 20,
+    4: 250,
+    12: 300,
+    15: 300,
+    18: 300,
+    25: 200,
+    33: 300,
+    11: 200,
 }
 
 SAMPLE_REPLACE_VAL = {
@@ -167,12 +209,6 @@ SAMPLE_REPLACE_VAL = {
     }
 }
 
-coord = [
-    -54.89831183203141,
-    -2.4850787331932724
-]
-
-geo_roi = ee.Geometry.Point(coord)
 
 '''
 
@@ -182,11 +218,27 @@ geo_roi = ee.Geometry.Point(coord)
 
 roi = ee.FeatureCollection(ASSET_ROI)
 
-tiles = ee.ImageCollection(ASSET_TILES)\
-    .filter('biome == "AMAZONIA"')\
-    .filter(f'year == 2023')
+# tiles = ee.ImageCollection(ASSET_TILES)\
+#     .filter('biome == "AMAZONIA"')\
+#     .filter(f'year == 2023')
 
-tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['grid_name']).get('list').getInfo()
+# tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['grid_name']).get('list').getInfo()
+
+tiles_list = [
+  "SA-21-Z-B",
+  "SA-22-X-D",
+  "SA-23-Z-C",
+  "SB-21-Y-D",
+  "SB-22-Y-D",
+  "SC-21-X-A",
+  "SC-21-X-B",
+  "SC-21-X-D",
+  "SC-22-V-B",
+  "SD-21-Y-C"
+]
+
+
+
 
 df_reference_area = pd.read_csv(PATH_REFERENCE_AREA).replace({
     'classe': SAMPLE_REPLACE_VAL['label']
@@ -195,7 +247,6 @@ df_reference_area = pd.read_csv(PATH_REFERENCE_AREA).replace({
 df_reference_area = df_reference_area.query('classe != 0')
 df_reference_area = df_reference_area.groupby(by=['classe', 'grid_name', 'year'])['area_ha'].sum().reset_index()
 
-print(df_reference_area.head())
 
 
 '''
@@ -207,10 +258,17 @@ print(df_reference_area.head())
 
 def get_samples(tile_id, year):
 
+    df_sp = pd.DataFrame([])
+
     # SC-22-X-C
     number_row = tile_id[3:5]
 
-    df_sp = pd.DataFrame([])
+    # get samples around the target tile
+    tile_list = [
+        tile_id,
+        # 'SC-{}-X-C'.format(str(int(number_row) + 1)),
+        # 'SC-{}-X-C'.format(str(int(number_row) - 1)),
+    ]
 
     df_proportion = df_reference_area.loc[
         (df_reference_area['grid_name'] == tile_id) &
@@ -219,28 +277,91 @@ def get_samples(tile_id, year):
 
     df_proportion['area_p'] = df_proportion['area_ha'] / df_proportion['area_ha'].sum()
 
-    print(df_proportion)
-
-    
-    for key, val in SAMPLE_PARAMS.items():
-        
-        n_samples_proportion = df_proportion.loc[df_proportion['classe'] == key, 'area_p'].values[0] * N_SAMPLES
-        n_samples_min = val
-        n_samples_exist = len(df_samples.loc[(df_samples['year'] == year) & (df_samples['label'] == key)])
-
+    for index, row in df_proportion.iterrows():
         n_samples_final = 0
+        n_samples_min = SAMPLE_PARAMS[row['classe']]
 
-        if n_samples_proportion > n_samples_min:
-            n_samples_final = n_samples_proportion
-        elif n_samples_proportion < n_samples_min:
-            n_samples_final = n_samples_min
-        
-        if n_samples_final < n_samples_exist: n_samples_exist
+        n_samples_proportion = int(row['area_p'] * N_SAMPLES)
+
+        # check the number of samples that exists in target area
+        n_samples_exist = len(df_samples.loc[
+            (df_samples['year'] == year) & 
+            (df_samples['label'] == row['classe']) #&
+            #(df_samples['grid_name'].isin(tile_list))
+        ])
+
+        n_samples_final = n_samples_proportion if n_samples_proportion > n_samples_min else n_samples_min
+
         if n_samples_final == 0: continue 
 
-        df_samples_get = df_samples.sample(n=int(n_samples_final))
+        n_samples_missing = int(n_samples_proportion - n_samples_final)
+        n_samples_missing = n_samples_exist if n_samples_missing > n_samples_exist else n_samples_missing
 
-        df_sp = pd.concat([df_sp, df_samples_get])  
+        print(row['classe'], n_samples_final, n_samples_exist, n_samples_missing)
+
+        df_samples_get = df_samples.loc[
+            (df_samples['year'] == year) & 
+            (df_samples['label'] == row['classe'])# &
+            #(df_samples['grid_name'].isin(tile_list))
+        ].sample(n=int(n_samples_final))
+
+        if n_samples_missing > 0:
+            df_sp_missing = df_samples.loc[
+                (df_samples['year'] == year) & 
+                (df_samples['label'] == row['classe'])
+            ].sample(n=int(n_samples_missing))
+
+            df_sp = pd.concat([df_sp, df_samples_get, df_sp_missing])  
+        else:
+            df_sp = pd.concat([df_sp, df_samples_get])  
+    
+#     for key, n_samples_min in SAMPLE_PARAMS.items():
+# 
+#         n_samples_final = 0
+#         
+#         # get samples based on area proportion
+#         n_samples_proportion = df_proportion.loc[df_proportion['classe'] == key, 'area_p'].mul(N_SAMPLES).values
+#         n_samples_proportion = 0 if len(n_samples_proportion) == 0 else n_samples_proportion[0]
+#         
+#         # check the number of samples that exists in target area
+#         n_samples_exist = len(df_samples.loc[
+#             (df_samples['year'] == year) & 
+#             (df_samples['label'] == key) #&
+#             #(df_samples['grid_name'].isin(tile_list))
+#         ])
+#         
+#         # check total samples for all tiles
+#         n_samples_exist_all = len(df_samples.loc[
+#             (df_samples['year'] == year) & 
+#             (df_samples['label'] == key)
+#         ])
+# 
+#         n_samples_final = n_samples_proportion if n_samples_proportion > n_samples_min else n_samples_min
+# 
+#         if n_samples_final == 0: continue 
+# 
+#         n_samples_final = n_samples_exist if n_samples_final > n_samples_exist else n_samples_final
+# 
+#         n_samples_missing = int(n_samples_proportion - n_samples_final)
+#         n_samples_missing = n_samples_exist_all if n_samples_missing > n_samples_exist_all else n_samples_missing
+# 
+#         print(key, n_samples_final, n_samples_exist, n_samples_missing)
+# 
+#         df_samples_get = df_samples.loc[
+#             (df_samples['year'] == year) & 
+#             (df_samples['label'] == key)# &
+#             #(df_samples['grid_name'].isin(tile_list))
+#         ].sample(n=int(n_samples_final))
+# 
+#         if n_samples_missing > 0:
+#             df_sp_missing = df_samples.loc[
+#                 (df_samples['year'] == year) & 
+#                 (df_samples['label'] == key)
+#             ].sample(n=int(n_samples_missing))
+# 
+#             df_sp = pd.concat([df_sp, df_samples_get, df_sp_missing])  
+#         else:
+#             df_sp = pd.concat([df_sp, df_samples_get])  
 
 
     return df_sp
@@ -287,11 +408,11 @@ for year in YEARS:
 
             # get image
             image = ee.Image(mosaic.filter(f'grid_name == "{tile_id}"').first())
-            image = ee.Image(image.divide(10000)).copyProperties(image)
+            # image = ee.Image(image.divide(10000)).copyProperties(image)
         
-            image = get_fractions_mosaic(image=image)
-            image = get_ndfi(image=image)
-            image = get_csfi(image=image)
+            # image = get_fractions_mosaic(image=image)
+            # image = get_ndfi(image=image)
+            # image = get_csfi(image=image)
 
             # select features
             image = ee.Image(image).select(INPUT_FEATURES)
@@ -373,3 +494,5 @@ for year in YEARS:
             )
 
             task.start()
+
+# gsutil cp 03_multiclass/model/* gs://imazon/mapbiomas/lulc/reference_map/model/

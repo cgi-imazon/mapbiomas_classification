@@ -47,7 +47,8 @@ cloud_cover = 100
 
 
 all_params = [
-    [2023, custom_detection_params]
+    [2024, custom_detection_params]
+    #[2023, custom_detection_params]
     #[2022, custom_detection_params],
     #[2021, custom_detection_params],
     #[2020, custom_detection_params],
@@ -141,7 +142,6 @@ def get_fractions(image):
     
     return image.addBands(fractions)
 
-
 def get_ndfi(image):
 
     summed = image.expression('b("gv") + b("npv") + b("soil")')
@@ -165,7 +165,6 @@ def get_ndfi(image):
     image = image.addBands(ndfi)
 
     return ee.Image(image)
-
 
 def scale_factor_bands(is_int, collection):
     def scale_image(image):
@@ -366,7 +365,7 @@ for i in all_params:
 
     # detection period
     dt_start = str(y) + '-01-01'
-    dt_end = str(y) + '-12-30'
+    dt_end = str(y) + '-10-08'
 
     # temporal window
     dt_start_window = str(y - i[1]['time_window'])  + '-01-01'

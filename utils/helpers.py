@@ -176,13 +176,14 @@ def get_similar_mask(segments, samples_harmonized, prop):
 
     samples_segments = segments.sampleRegions(
         collection=samples_harmonized,
-        scale=10,
+        scale=30,
         properties=[prop],
     )
 
+    if samples_segments.size().getInfo() == 0: return False
+
     segments_values = ee.List(
-        samples_segments
-        .reduceColumns(ee.Reducer.toList().repeat(2),[prop, 'segments']).get('list')
+        samples_segments.reduceColumns(ee.Reducer.toList().repeat(2),[prop, 'segments']).get('list')
     )   
 
     similiar_mask = segments.remap(

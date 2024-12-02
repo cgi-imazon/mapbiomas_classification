@@ -36,13 +36,15 @@ PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 PATH_LOGFILE = f'{PATH_DIR}/data/log.csv'
 
 # PATH_AREAS = 'data/area/areas_la.csv'
-PATH_AREAS = 'data/area/areas_la_1985_2022.csv'
+# PATH_AREAS = 'data/area/areas_la_1985_2022.csv'
+PATH_AREAS = 'data/area/areas_amazon.csv'
 
-ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+# ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
-ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/classification'
+ASSET_OUTPUT = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification'
 
 OUTPUT_VERSION = '1'
 
@@ -94,8 +96,9 @@ YEARS = [
     # 2000, 2001, 2002,
     # 2003, 2004, 
     # 2005, 2006, 2007, 2008,
-    # 2009, 2010, 
-    2011, 
+    # 2009, 
+    # 2010, 
+    # 2011, 
     # 2012, 
     # 2013, 
     # 2014,
@@ -108,6 +111,7 @@ YEARS = [
     # 2021, 
     # 2022, 
     # 2023
+    2024
 ]
 
 
@@ -155,16 +159,20 @@ SAMPLE_REPLACE_VAL = {
 
 '''
 
-roi = ee.FeatureCollection(ASSET_ROI)
+# roi = ee.FeatureCollection(ASSET_ROI)
+roi = ee.FeatureCollection(ASSET_ROI)\
+    .filter('Bioma == "Amazônia"')
 
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 tiles_list = list(set(tiles_list))
 
+print(len(tiles_list))
+
 # select half
-half = int(len(tiles_list) / 2)
-tiles_list = tiles_list[:half]
+# half = int(len(tiles_list) / 2)
+# tiles_list = tiles_list[:half]
 
 '''
     
@@ -179,15 +187,9 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
     res = []
 
-    # total dataset samples
-    list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*'))
-
-    # filter 20%
-    list_samples = random.sample(list_samples, int(len(list_samples) * 0.5))
-    list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
-
     # balance samples based on stratified area
-    df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
+    # df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
+    df_areas = pd.read_csv(PATH_AREAS).query(f'year == 2022 and tile == {tile}')
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
 
@@ -209,7 +211,7 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
         sp_available = samples.query(f'label == {label}').shape[0]
 
         if sp_available > min_samples_area:
-            samples_selected = samples.query(f'label == {label}').sample(n=min_samples_area)
+            samples_selected = samples.query(f'label == {label}').sample(n=min_samples_area, replace=True)
         else:
             n_sp = int(min_samples_area - sp_available)
 
@@ -258,11 +260,18 @@ def get_samples(tile: int, date: str, sr='l8'):
 
     for t in tiles_list:
         
-        list_samples = list(glob(f'{PATH_DIR}/data/{year}/{t}/*'))
+        #list_samples = list(glob(f'{PATH_DIR}/data/{year}/{t}/*'))
 
-        if len(list_samples) == 0: continue
+        # if len(list_samples) == 0: continue
+        if not os.path.exists(f'{PATH_DIR}/data/{year}/{t}.geojson'): continue
 
-        list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
+        #list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
+        #list_samples_df = gpd.read_file(f'{PATH_DIR}/data/{year}/{t}.geojson')
+        try:
+            list_samples_df = gpd.read_file(f'{PATH_DIR}/data/{year}/{t}.geojson')
+        except Exception as e:
+            print(f"Erro ao ler {PATH_DIR}/data/{year}/{t}.geojson")
+            continue
 
         list_samples_df = list_samples_df.query(
             f'DATE_ACQUIRED >= "{date_t0.strftime("%Y-%m-%d")}" or ' + 
@@ -299,9 +308,30 @@ for year in YEARS:
         .reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
         #.filterBounds(coords)\
 
-    #tiles_list =  list(glob(f'{PATH_DIR}/data/{year}/*'))
-    #tiles_list = [int(x.split('/')[-1]) for x in tiles_list]
+    print('primeiro get info')
 
+    tiles_list =  list(glob(f'{PATH_DIR}/data/{year}/*.geojson'))
+    tiles_list = [int(x.split('/')[-1].replace('.geojson', '')) for x in tiles_list]
+
+    # total dataset samples
+    #list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*'))
+    list_samples = list(glob(f'{PATH_DIR}/data/{year}/*.geojson'))
+
+    # filter 20%
+    list_samples = random.sample(list_samples, int(len(list_samples) * 0.2))
+    # list_samples_df = pd.concat([gpd.read_file(x) for x in list_samples])
+    tmp = []
+    for x in list_samples:
+        try:
+            gpd_sp = gpd.read_file(x)
+            tmp.append(gpd_sp)
+        except Exception as e:
+            print(f"Erro ao ler {x}: {e}")
+            continue
+
+    list_samples_df = pd.concat(tmp)
+
+    print('filtrou 0.2 das amostras')
 
     for tile in tiles_list:
 
@@ -317,6 +347,7 @@ for year in YEARS:
             ee.ImageCollection(ASSET_LANDSAT_IMAGES['l5c2']['idCollection'])
             .filterBounds(center)
             .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
+            .filter('CLOUD_COVER <= 50')
             .map(lambda image: apply_scale_factors(image))
             .map(lambda image: image.set('sensor', 'l5'))
             .select(
@@ -330,6 +361,7 @@ for year in YEARS:
             ee.ImageCollection(ASSET_LANDSAT_IMAGES['l7c2']['idCollection'])
             .filterBounds(center)
             .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
+            .filter('CLOUD_COVER <= 50')
             .map(lambda image: apply_scale_factors(image))
             .map(lambda image: image.set('sensor', 'l7'))
             .select(
@@ -343,6 +375,7 @@ for year in YEARS:
             ee.ImageCollection(ASSET_LANDSAT_IMAGES['l8c2']['idCollection'])
             .filterBounds(center)
             .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
+            .filter('CLOUD_COVER <= 50')
             .map(lambda image: apply_scale_factors(image))
             .map(lambda image: image.set('sensor', 'l8'))
             .select(
@@ -356,6 +389,7 @@ for year in YEARS:
             ee.ImageCollection(ASSET_LANDSAT_IMAGES['l9c2']['idCollection'])
             .filterBounds(center)
             .filterDate(f'{str(year)}-01-01', f'{str(year)}-12-31')
+            .filter('CLOUD_COVER <= 50')
             .map(lambda image: apply_scale_factors(image))
             .map(lambda image: image.set('sensor', 'l9'))
             .select(
@@ -369,12 +403,15 @@ for year in YEARS:
 
         image_list = images.reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
 
+        print('gerou a lista de image ids')
+
+
         image_list = list(set(image_list) - set(image_list_loaded))
         image_list = list(set(image_list))
 
         for img_id in image_list:
 
-            log = open(PATH_LOGFILE, 'a+')
+            # log = open(PATH_LOGFILE, 'a+')
 
             imagename = '{}_{}_{}'.format(img_id, str(year),OUTPUT_VERSION)
             
@@ -383,24 +420,36 @@ for year in YEARS:
             try:
                 assetInfo = ee.data.getAsset(assetId)
             except Exception as e:
+
+                print('entrou no exception')
                 
                 date_target = f'{str(year)}-08-01'
                 df_target_sample = False
                 sensor = 'l8'
 
 
-                if os.path.isfile(f'{PATH_DIR}/data/{str(year)}/{tile}/{img_id}.geojson'):
-                    df_target_sample = gpd.read_file(f'{PATH_DIR}/data/{str(year)}/{tile}/{img_id}.geojson')
+                # if os.path.isfile(f'{PATH_DIR}/data/{str(year)}/{tile}/{img_id}.geojson'):
+                #     df_target_sample = gpd.read_file(f'{PATH_DIR}/data/{str(year)}/{tile}/{img_id}.geojson')
+                #     date_target = df_target_sample['DATE_ACQUIRED'].values[0]   
+                #     sensor = df_target_sample['sensor'].values[0]  
+
+                try:
+                    df_target_sample = gpd.read_file(f'{PATH_DIR}/data/{str(year)}/{tile}.geojson')
+                except Exception as e:
+                    print(f"Erro ao ler {PATH_DIR}/data/{year}/{tile}.geojson")
+                    continue
+                
+                df_target_sample = df_target_sample.query(f'LANDSAT_SCENE_ID == "{img_id}"')
+                if len(df_target_sample) != 0: 
                     date_target = df_target_sample['DATE_ACQUIRED'].values[0]   
                     sensor = df_target_sample['sensor'].values[0]  
+                    print(date_target, sensor)
 
-                
+                    
                 samples_surrounded = get_samples(tile, date=date_target, sr=sensor)
                 
                 # if there is no samples, skip
                 if df_target_sample is False and samples_surrounded is None: 
-                    log.write(f'\n{year},{tile},{img_id},fail')
-                    log.close()
                     continue
 
 
@@ -548,9 +597,6 @@ var classification = image
 Map.addLayer(classification.randomVisualizer())
 
 Map.centerObject(image,12)
-
-https://code.earthengine.google.com/030bcb76dfcc14dfeb8b3880c23cb8cd
-
 
 
 610319

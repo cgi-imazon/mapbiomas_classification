@@ -43,7 +43,7 @@ ASSET_LULC = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas
 
 ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col4_points_w_edge_and_edited_v1'
 
-
+ASSET_STABLE = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_sentinel/stable_2018_2023'
 
 SENTINEL_NEW_NAMES = [
     'blue',
@@ -86,8 +86,8 @@ YEARS = [
     # 2017, 
     # 2018, 
     # 2019, 
-    2020,
-    2021, 
+    # 2020,
+    # 2021, 
     2022, 
     # 2023
 ]
@@ -96,13 +96,56 @@ YEARS = [
 
 
 INPUT_FEATURES = [
-    'gv', 
-    'npv', 
-    'soil', 
-    'cloud',
-    'gvs',
-    'ndfi', 
-    'csfi'
+    # 'gv', 
+    # 'npv', 
+    # 'soil', 
+    # 'cloud',
+    # 'gvs',
+    # 'ndfi', 
+    # 'csfi',
+    "blue_median",
+    "blue_median_wet",
+    "blue_median_dry",
+    "blue_stdDev",
+    "green_median",
+    "green_median_dry",
+    "green_median_wet",
+    "green_median_texture",
+    "green_min",
+    "green_stdDev",
+    "red_median",
+    "red_median_dry",
+    "red_min",
+    "red_median_wet",
+    "red_stdDev",
+    "nir_median",
+    "nir_median_dry",
+    "nir_median_wet",
+    "nir_stdDev",
+    "red_edge_1_median",
+    "red_edge_1_median_dry",
+    "red_edge_1_median_wet",
+    "red_edge_1_stdDev",
+    "red_edge_2_median",
+    "red_edge_2_median_dry",
+    "red_edge_2_median_wet",
+    "red_edge_2_stdDev",
+    "red_edge_3_median",
+    "red_edge_3_median_dry",
+    "red_edge_3_median_wet",
+    "red_edge_3_stdDev",
+    "red_edge_4_median",
+    "red_edge_4_median_dry",
+    "red_edge_4_median_wet",
+    "red_edge_4_stdDev",
+    "swir1_median",
+    "swir1_median_dry",
+    "swir1_median_wet",
+    "swir1_stdDev",
+    "swir2_median",
+    "swir2_median_wet",
+    "swir2_median_dry",
+    "swir2_stdDev"
 ]
 
 SEGMENT_BANDS = [
@@ -120,6 +163,9 @@ SAMPLE_REPLACE_VAL = {
         6:3,
         5:3,
 
+        4:4,
+        11:11,
+        12:12,
         19:18,
         39:18,
         20:18,
@@ -157,7 +203,7 @@ SAMPLE_REPLACE_VAL = {
 '''
 
 HARMONIZATION_CLASSES_SAMPLES = {
-    "AFLORAMENTO ROCHOSO": 25,
+    "AFLORAMENTO ROCHOSO": 12,
     "APICUM": 12,
     "AQUICULTURA": 33,
     "CAMPO ALAGADO E ÁREA PANTANOSA": 11,
@@ -200,8 +246,8 @@ tiles = ee.ImageCollection(ASSET_TILES)\
     .filter(f'year == 2023')\
     .filter('biome == "AMAZONIA"')
     #.filterBounds(roi_default.geometry())
-    
-    
+
+stable = ee.Image(ASSET_STABLE)
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['grid_name']).get('list').getInfo()
 
@@ -210,34 +256,6 @@ samples = ee.FeatureCollection(ASSET_SAMPLES)\
 
 print('samples ' + str(samples.size().getInfo()))
 
-
-
-'''
-    Get Stable Areas
-'''
-
-YEARS_STABLE = [
-    # 2000, 2001, 2002, 2003, 2004, 2005,
-    # 2006, 2007, 2008, 2009, 2010, 2011,
-    # 2012, 2013, 2014, 2015, 2016, 2017,
-    2018, 2019, 2020, 2021, 2022, 2023
-]
-
-BANDS_STABLE = list(map(lambda y: f'classification_{str(y)}', YEARS_STABLE))
-
-
-
-from_vals = [int(x) for x in list(SAMPLE_REPLACE_VAL['label'].keys())]
-to_vals = list(SAMPLE_REPLACE_VAL['label'].values())
-
-
-lulc = ee.Image(ASSET_LULC).select(BANDS_STABLE)
-
-count_runs = lulc.reduce(ee.Reducer.countRuns())
-
-stable = ee.Image(lulc.select('classification_2023').updateMask(count_runs.eq(1)))
-
-stable = ee.Image(stable).remap(from_vals, to_vals, 0).rename('stable')
 
 
 '''
@@ -255,35 +273,47 @@ def get_dataset(tile_id: str):
         return None, None
 
     
-
     tile_image = ee.Image(tiles.filter(f'grid_name == "{tile_id}"').first())
 
     roi = tile_image.geometry()
 
     samples_harmonized_tile = samples_harmonized.filterBounds(roi)
 
+
+
     try:
         image = ee.Image(mosaic.filter(f'grid_name == "{tile_id}"').first())
-        image = ee.Image(image.divide(10000)).copyProperties(image)
+        # image = ee.Image(image.divide(10000)).copyProperties(image)
 
+        stable_grid = ee.Image(stable.clip(roi)).rename('label')
 
-        stable_grid = stable.clip(roi)
+        # stable samples
+        samples_stable = stable_grid.stratifiedSample(
+            region=roi,
+            scale=10,
+            numPoints=10,  # Define o fator de amostragem
+            dropNulls=True,
+            geometries=True
+        )
+
+        samples_seed = samples_stable.merge(samples_harmonized_tile)
+
 
         # get segments
         segments = get_segments(ee.Image(image).select(SEGMENT_BANDS))
 
-        segments = ee.Image(segments).reproject('EPSG:4326', None, 30)
+        segments = ee.Image(segments).reproject('EPSG:4326', None, 50)
 
-        similar_mask = ee.Image(get_similar_mask(segments, samples_harmonized, 'label').selfMask())
+        similar_mask = ee.Image(get_similar_mask(segments, samples_seed, 'label').selfMask())
         
 
         # redução de componentes conectados com percentil 5 e 95
-        percentil = segments.addBands(stable_grid, ['stable']).reduceConnectedComponents(
+        percentil = segments.addBands(stable_grid, ['label']).reduceConnectedComponents(
             ee.Reducer.percentile([5, 95]), 'segments'
         )
 
         # redução de componentes conectados com o modo
-        validated = segments.addBands(stable_grid, ['stable']).reduceConnectedComponents(
+        validated = segments.addBands(stable_grid, ['label']).reduceConnectedComponents(
             ee.Reducer.mode(), 'segments'
         )
 
@@ -297,9 +327,9 @@ def get_dataset(tile_id: str):
         similar_mask_validated = similar_mask.updateMask(similar_mask.eq(validated)).rename('label')
 
 
-        image = get_fractions_mosaic(image=image)
-        image = get_ndfi(image=image)
-        image = get_csfi(image=image)
+        # image = get_fractions_mosaic(image=image)
+        # image = get_ndfi(image=image)
+        # image = get_csfi(image=image)
 
         # select features
         image = ee.Image(image).select(INPUT_FEATURES)
@@ -318,20 +348,20 @@ def get_dataset(tile_id: str):
         samples_segments = image.addBands(similar_mask_validated.selfMask()).sample(
             region=roi,
             scale=30,
-            factor=0.003,  # Define o fator de amostragem
+            factor=0.005,  # Define o fator de amostragem
             dropNulls=True,
             geometries=True
         )
 
         # set properties
-        samples_image = samples_image.map(lambda feat: feat.copyProperties(image))
+        # samples_image = samples_image.map(lambda feat: feat.copyProperties(image))
         samples_image = samples_image.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))
-        # samples_image = samples_image.map(lambda feat: feat.set('tile', tile_id))
+        samples_image = samples_image.map(lambda feat: feat.set('grid_name', tile_id))
 
 
-        samples_segments = samples_segments.map(lambda feat: ee.Feature(feat).copyProperties(image))
+        # samples_segments = samples_segments.map(lambda feat: ee.Feature(feat).copyProperties(image))
         samples_segments = samples_segments.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))#.filter(ee.Filter.neq('label', 0))
-        # samples_segments = samples_segments.map(lambda feat: feat.set('tile', tile_id))
+        samples_segments = samples_segments.map(lambda feat: feat.set('grid_name', tile_id))
 
         if samples_image.size().getInfo() > 0:
             samples_final = samples_image.merge(samples_segments)
