@@ -10,6 +10,7 @@ import geopandas as gpd
 from retry import retry
 import concurrent.futures
 import geemap
+geemap.update_package()
 
 from utils.helpers import *
 from pprint import pprint
@@ -386,10 +387,10 @@ def classify(tile_list: list, year:int, tile:str):
 
 for year in YEARS:
     
-    tiles = list(glob(f'{PATH_DIR}\\data\\{year}\\*'))
-    tiles = [x.split('\\') for x in tiles]
-
-    print(tiles[0])
+    #tiles = list(glob(f'{PATH_DIR}\\data\\{year}\\*'))
+    #tiles = [x.split('\\') for x in tiles]
+    tiles = [225066]
+  
 
 
 
