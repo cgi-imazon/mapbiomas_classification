@@ -10,7 +10,6 @@ import geopandas as gpd
 from retry import retry
 import concurrent.futures
 import geemap
-geemap.update_package()
 
 from utils.helpers import *
 from pprint import pprint
@@ -30,21 +29,23 @@ ee.Initialize(project=PROJECT)
 
 '''
 
-# PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
-PATH_DIR = 'C:\\Imazon\\mapbiomas_classification'
+PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
+# PATH_DIR = 'C:\\Imazon\\mapbiomas_classification'
 
 # ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
-PATH_SAMPLES = 'mapbiomas_classification\\data\\2024'
+# PATH_SAMPLES = 'mapbiomas_classification\\data\\2024'
+PATH_SAMPLES = f'{PATH_DIR}/data'
 
-PATH_AREAS = 'mapbiomas_classification\\data\\area\\areas_amazon.csv'
+# PATH_AREAS = 'mapbiomas_classification\\data\\area\\areas_amazon.csv'
+PATH_AREAS = f'{PATH_DIR}/data/area/areas_amazon.csv'
 
 ASSET_CLASSIFICATION = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification'
 
-ASSET_OUTPUT = 'projects/imazon-simex/LULC/LEGAL_AMAZON/features-int'
+ASSET_OUTPUT = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/integrated'
 
 
 
@@ -69,7 +70,7 @@ YEARS = [
     2024
 ]
 
-EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=30)
+EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
 '''
 
@@ -127,9 +128,9 @@ SAMPLE_REPLACE_VAL = {
 
 '''
 
-roi = ee.FeatureCollection(ASSET_ROI)
+biome = ee.FeatureCollection(ASSET_ROI).filter('Bioma == "Amazônia"')
 
-tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
+tiles = ee.ImageCollection(ASSET_TILES).filterBounds(biome.geometry())
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 
@@ -266,13 +267,14 @@ def get_features(tile: str, year: int):
         .addBands(agriculture_year)\
         .addBands(water_year)
         
-    return image
+    return image, roi
 
-@retry()
+#@retry()
 def get_dataset(tile: str, year: int):
 
     try:
-        df_samples = gpd.read_file(f'{PATH_SAMPLES}\\{year}\\{tile}.geojson')
+        df_samples = gpd.read_file(f'{PATH_SAMPLES}/{year}/{tile}.geojson')
+        df_samples = df_samples[['label','geometry']]
     except Exception as e:
         print(f'erro no tile {e}')
         return None
@@ -280,12 +282,17 @@ def get_dataset(tile: str, year: int):
     labels_classified = df_samples['label'].drop_duplicates().values
     labels_classified = [str(x) for x in labels_classified]
 
+    print(labels_classified)
+
 
     # convert to ee features
-    samples = geemap.geopandas_to_ee(df_samples)
-    samples = samples.map(lambda feat: feat.select(['label', 'geometry']))
+    try:
+        samples = geemap.geopandas_to_ee(df_samples)
+    except Exception as e:
+        print('error at getting samples')
+        return None
 
-    image = get_features(tile, year)
+    image, roi = get_features(tile, year)
 
     sample_values = image.sampleRegions(
         collection = samples, 
@@ -343,6 +350,10 @@ def get_dataset(tile: str, year: int):
 
     region = roi.getInfo()['coordinates']
 
+    print(region)
+
+
+
     print(f'exporting features: {name}')
 
     try:
@@ -363,7 +374,7 @@ def get_dataset(tile: str, year: int):
 
     return f'success exporting tile {tile}'
 
-def classify(tile_list: list, year:int, tile:str):
+def classify(tile_list: list, year:int):
 
     future_to_point = {EXECUTOR.submit(get_dataset, tile_id, year): tile_id for tile_id in tile_list}
 
@@ -389,9 +400,14 @@ for year in YEARS:
     
     #tiles = list(glob(f'{PATH_DIR}\\data\\{year}\\*'))
     #tiles = [x.split('\\') for x in tiles]
-    tiles = [225066]
-  
+    tiles_list = ['225066']
 
+    for tile in tiles_list:
+        result = get_dataset(tile, year)
+
+        if result is None: 
+            print('error - exporting ')
+            continue
 
 
 
