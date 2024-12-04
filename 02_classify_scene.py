@@ -19,7 +19,7 @@ from glob import glob
 
 #ee.Initialize(credentials)
 
-# PROJECT = 'sad-deep-learning-274812'
+#PROJECT = 'sad-deep-learning-274812'
 PROJECT = 'mapbiomas'
 
 ee.Initialize(project=PROJECT)
@@ -165,9 +165,20 @@ roi = ee.FeatureCollection(ASSET_ROI)\
 
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
-tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
-tiles_list = list(set(tiles_list))
+#tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+#tiles_list = list(set(tiles_list))
 
+
+tiles_list = [
+    #'227066', 
+    
+    290064, 
+    
+    #230063,
+    #230060,
+
+    221061
+]
 print(len(tiles_list))
 
 # select half
@@ -199,7 +210,7 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
 
         label, min_samples_default = row['label'], row['min_samples']
 
-        df_areas_year = df_areas.query(f'cls == {label}')
+        df_areas_year = df_areas.query(f'label == {label}')
 
         if df_areas_year.shape[0] > 0:
             min_samples_area = int(df_areas_year['min_samples'].values[0])
@@ -310,8 +321,8 @@ for year in YEARS:
 
     print('primeiro get info')
 
-    tiles_list =  list(glob(f'{PATH_DIR}/data/{year}/*.geojson'))
-    tiles_list = [int(x.split('/')[-1].replace('.geojson', '')) for x in tiles_list]
+    # tiles_list =  list(glob(f'{PATH_DIR}/data/{year}/*.geojson'))
+    # tiles_list = [int(x.split('/')[-1].replace('.geojson', '')) for x in tiles_list]
 
     # total dataset samples
     #list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*'))
@@ -435,11 +446,13 @@ for year in YEARS:
 
                 try:
                     df_target_sample = gpd.read_file(f'{PATH_DIR}/data/{str(year)}/{tile}.geojson')
+                    df_target_sample = df_target_sample.query(f'LANDSAT_SCENE_ID == "{img_id}"')
                 except Exception as e:
                     print(f"Erro ao ler {PATH_DIR}/data/{year}/{tile}.geojson")
-                    continue
+                    df_target_sample = gpd.GeoDataFrame()
+                    pass
                 
-                df_target_sample = df_target_sample.query(f'LANDSAT_SCENE_ID == "{img_id}"')
+                
                 if len(df_target_sample) != 0: 
                     date_target = df_target_sample['DATE_ACQUIRED'].values[0]   
                     sensor = df_target_sample['sensor'].values[0]  
@@ -490,7 +503,6 @@ for year in YEARS:
                 labels_classified = [str(x) for x in labels_classified]
 
                 print(labels_classified)
-
 
 
 
