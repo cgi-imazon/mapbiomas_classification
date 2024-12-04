@@ -10,6 +10,7 @@ import geopandas as gpd
 from retry import retry
 import concurrent.futures
 import geemap
+import random
 
 from utils.helpers import *
 from pprint import pprint
@@ -17,6 +18,7 @@ from glob import glob
 
 
 PROJECT = 'sad-deep-learning-274812'
+#PROJECT = 'mapbiomas'
 
 ee.Initialize(project=PROJECT)
 
@@ -78,7 +80,7 @@ EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
 FEATURE_SPACE = [
     'mode',
-    'mode_secondary',
+    #'mode_secondary',
     #'transitions_total',
     'transitions_year',
     #'distinct_total',
@@ -160,14 +162,14 @@ def get_balanced_samples(balance: pd.DataFrame, samples: ee.featurecollection.Fe
 
         df_areas_target = df_areas.loc[df_areas['label'] == int(label)] 
 
-        n_samples_fill =  df_areas_target['min_samples'].values[0] if not df_areas_target.empty else 0
+        n_samples_area =  df_areas_target['min_samples'].values[0] if not df_areas_target.empty else 0
 
-        if n_samples_fill > min_samples:
+        if n_samples_area > min_samples:
             samples_balanced = samples_balanced.merge(samples.filter(
-                ee.Filter.eq('label', int(label))).limit(int(min_samples)))
+                ee.Filter.eq('label', int(label))).limit(int(n_samples_area)))
         else:
             samples_balanced = samples_balanced.merge(samples.filter(
-                ee.Filter.eq('label', int(label))).limit(int(n_samples_fill)))
+                ee.Filter.eq('label', int(label))).limit(int(min_samples)))
 
     return samples_balanced
 
@@ -274,7 +276,16 @@ def get_dataset(tile: str, year: int):
 
     try:
         df_samples = gpd.read_file(f'{PATH_SAMPLES}/{year}/{tile}.geojson')
+
+        list_random_sp = glob(f'{PATH_SAMPLES}/{year}/*')
+
+        df_random_sp = pd.concat([gpd.read_file(x) for x in random.sample(list_random_sp, 3)])
+        df_samples = pd.concat([df_samples, df_random_sp])
+
         df_samples = df_samples[['label','geometry']]
+        df_samples = df_samples.query('label != 0')
+
+
     except Exception as e:
         print(f'erro no tile {e}')
         return None
@@ -326,12 +337,11 @@ def get_dataset(tile: str, year: int):
         .copyProperties(image, ['system:footprint'])
         .copyProperties(image, ['system:time_start'])
     )
-
-    probabilities = probabilities\
-        .arrayProject([0])\
-        .arrayFlatten([labels_classified])\
-        .reduce(ee.Reducer.max())
     
+    probabilities = probabilities\
+        .toArray().arrayArgmax()\
+        .arrayGet([0])
+
 
     probabilities = ee.Image(probabilities).multiply(100).rename('probabilities')
 
@@ -346,12 +356,9 @@ def get_dataset(tile: str, year: int):
 
 
     name = '{}-{}-{}'.format(int(tile), year, OUTPUT_VERSION)
-    assetId = '{}-{}'.format(ASSET_OUTPUT, name)
+    assetId = '{}/{}'.format(ASSET_OUTPUT, name)
 
     region = roi.getInfo()['coordinates']
-
-    print(region)
-
 
 
     print(f'exporting features: {name}')

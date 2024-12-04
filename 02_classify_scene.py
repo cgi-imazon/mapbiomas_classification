@@ -524,9 +524,9 @@ for year in YEARS:
                 )
 
                 probabilities = probabilities\
-                    .arrayProject([0])\
-                    .arrayFlatten([labels_classified])\
-                    .reduce(ee.Reducer.max())
+                    .toArray().arrayArgmax()\
+                    .arrayGet([0])
+
 
                 probabilities = ee.Image(probabilities).multiply(100).rename('probabilities')
 
