@@ -20,7 +20,7 @@ from glob import glob
 #ee.Initialize(credentials)
 
 #PROJECT = 'sad-deep-learning-274812'
-PROJECT = 'mapbiomas'
+PROJECT = 'ee-mapbiomas-imazon'
 
 ee.Initialize(project=PROJECT)
 
@@ -36,15 +36,16 @@ PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 PATH_LOGFILE = f'{PATH_DIR}/data/log.csv'
 
 # PATH_AREAS = 'data/area/areas_la.csv'
-# PATH_AREAS = 'data/area/areas_la_1985_2022.csv'
-PATH_AREAS = 'data/area/areas_amazon.csv'
+PATH_AREAS = 'data/area/areas_la_1985_2022.csv'
+# PATH_AREAS = 'data/area/areas_amazon.csv'
 
-# ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
-ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
+ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+#ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
-ASSET_OUTPUT = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification'
+#ASSET_OUTPUT = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification'
+ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/mapbiomas/lulc_landsat/classification'
 
 OUTPUT_VERSION = '1'
 
@@ -88,14 +89,30 @@ ASSET_LANDSAT_IMAGES = {
 
 
 YEARS = [
-    # 1985
-    # 1985, 1986, 1987
-    # 1988, 1989, 1990, 1991, 
-    # 1992, 1993, 1994, 1995, 1996,
-    # 1997, 1998, 1999, 
-    # 2000, 2001, 2002,
-    # 2003, 2004, 
-    # 2005, 2006, 2007, 2008,
+    1985, 
+    # 1986, 
+    # 1987
+    # 1988, 
+    # 1989, 
+    # 1990, 
+    # 1991, 
+    # 1992, 
+    # 1993, 
+    # 1994, 
+    # 1995, 
+    # 1996,
+    # 1997, 
+    # 1998, 
+    # 1999, 
+    # 2000, 
+    # 2001, 
+    # 2002,
+    # 2003, 
+    # 2004, 
+    # 2005, 
+    # 2006, 
+    # 2007, 
+    # 2008,
     # 2009, 
     # 2010, 
     # 2011, 
@@ -111,7 +128,7 @@ YEARS = [
     # 2021, 
     # 2022, 
     # 2023
-    2024
+    # 2024
 ]
 
 
@@ -147,11 +164,45 @@ SAMPLE_PARAMS = pd.DataFrame([
     {'label': 33, 'min_samples': N_SAMPLES * 0.15},
 ])
 
+
 SAMPLE_REPLACE_VAL = {
     'label':{
-        11: 12
+        3:3,
+        6:3,
+        5:3,
+
+        19:18,
+        39:18,
+        20:18,
+        40:18,
+        62:18,
+        41:18,
+        
+        36: 3,
+
+        46: 18, # coffe
+        47: 18, # citrus
+        35: 18, # palm oil
+        48: 18, # other perennial crops
+
+        9:3,
+
+        30:25,
+        23:25,
+        22:25,
+        29:25,
+        24:25,
+
+
+        15: 15,
+        33: 33,
+
+        4:4,
+        12:12
+
     }
 }
+
 
 '''
 
@@ -159,27 +210,21 @@ SAMPLE_REPLACE_VAL = {
 
 '''
 
-# roi = ee.FeatureCollection(ASSET_ROI)
-roi = ee.FeatureCollection(ASSET_ROI)\
-    .filter('Bioma == "Amazônia"')
+roi = ee.FeatureCollection(ASSET_ROI)
+#roi = ee.FeatureCollection(ASSET_ROI)\
+#    .filter('Bioma == "Amazônia"')
+
+df_areas_amazon = pd.read_csv(PATH_AREAS).replace(SAMPLE_REPLACE_VAL)\
+    .groupby(by=['tile','year','label'])['area'].sum().reset_index()
+
 
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
 #tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 #tiles_list = list(set(tiles_list))
 
-
-tiles_list = [
-    #'227066', 
-    
-    290064, 
-    
-    #230063,
-    #230060,
-
-    221061
-]
-print(len(tiles_list))
+#print(tiles_list[:2])
+#exit()
 
 # select half
 # half = int(len(tiles_list) / 2)
@@ -199,8 +244,8 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
     res = []
 
     # balance samples based on stratified area
-    # df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
-    df_areas = pd.read_csv(PATH_AREAS).query(f'year == 2022 and tile == {tile}')
+    df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
+    # df_areas = df_areas_amazon.query(f'year == 2022 and tile == {tile}')
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
 
@@ -226,21 +271,22 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame):
         else:
             n_sp = int(min_samples_area - sp_available)
 
-            samples_selected_plus = list_samples_df.query(f'label == {label}').sample(n=n_sp)
-            samples_selected_avail = samples.query(f'label == {label}').sample(n=sp_available)
+            # samples_selected_plus = list_samples_df.query(f'label == {label}').sample(n=n_sp, replace=True)
+            samples_selected_avail = samples.query(f'label == {label}').sample(n=sp_available,replace=True)
 
-            samples_selected = pd.concat([samples_selected_avail, samples_selected_plus])
+            # samples_selected = pd.concat([samples_selected_avail, samples_selected_plus])
+            samples_selected = samples_selected_avail
 
 
         res.append(samples_selected)
 
     # add samples to rare classes
-    min_samples_gras = list_samples_df.query('label == 12').sample(n=15)
-    min_samples_agr = list_samples_df.query('label == 18').sample(n=15)
-    min_samples_water = list_samples_df.query('label == 33').sample(n=15)
-    min_samles_savana = list_samples_df.query('label == 4').sample(n=15)
-    min_samles_savana = list_samples_df.query('label == 15').sample(n=15)
-    min_samles_forest = list_samples_df.query('label == 3').sample(n=15)
+    min_samples_gras = list_samples_df.query('label == 12').sample(n=15,replace=True)
+    min_samples_agr = list_samples_df.query('label == 18').sample(n=15,replace=True)
+    min_samples_water = list_samples_df.query('label == 33').sample(n=15,replace=True)
+    min_samles_savana = list_samples_df.query('label == 4').sample(n=15,replace=True)
+    min_samles_savana = list_samples_df.query('label == 15').sample(n=15,replace=True)
+    min_samles_forest = list_samples_df.query('label == 3').sample(n=15,replace=True)
 
     # 
     res.append(min_samples_gras)
@@ -314,15 +360,15 @@ def save_log():
 
 for year in YEARS:
 
-    image_list_loaded = ee.ImageCollection(ASSET_OUTPUT)\
+    image_list_loaded = ee.ImageCollection('projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification')\
         .filter(f'version == "1" and year == {str(year)}')\
         .reduceColumns(ee.Reducer.toList(), ['LANDSAT_SCENE_ID']).get('list').getInfo()
         #.filterBounds(coords)\
 
     print('primeiro get info')
 
-    # tiles_list =  list(glob(f'{PATH_DIR}/data/{year}/*.geojson'))
-    # tiles_list = [int(x.split('/')[-1].replace('.geojson', '')) for x in tiles_list]
+    tiles_list =  list(glob(f'{PATH_DIR}/data/{year}/*.geojson'))
+    tiles_list = [int(x.split('/')[-1].replace('.geojson', '')) for x in tiles_list]
 
     # total dataset samples
     #list_samples = list(glob(f'{PATH_DIR}/data/{year}/*/*'))
@@ -462,7 +508,7 @@ for year in YEARS:
                 samples_surrounded = get_samples(tile, date=date_target, sr=sensor)
                 
                 # if there is no samples, skip
-                if df_target_sample is False and samples_surrounded is None: 
+                if len(df_target_sample) == 0 and samples_surrounded is None: 
                     continue
 
 

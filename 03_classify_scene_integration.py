@@ -54,7 +54,7 @@ ASSET_OUTPUT = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/integrated'
 '''
     version 1: fetures from all sensors 
 '''
-OUTPUT_VERSION = '1'
+OUTPUT_VERSION = '2'
 
 
 YEARS = [
@@ -73,6 +73,45 @@ YEARS = [
 ]
 
 EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+
+
+SAMPLE_REPLACE_VAL = {
+    'label':{
+        3:3,
+        6:3,
+        5:3,
+
+        19:18,
+        39:18,
+        20:18,
+        40:18,
+        62:18,
+        41:18,
+        
+        36: 3,
+
+        46: 18, # coffe
+        47: 18, # citrus
+        35: 18, # palm oil
+        48: 18, # other perennial crops
+
+        9:3,
+
+        30:25,
+        23:25,
+        22:25,
+        29:25,
+        24:25,
+
+
+        15: 15,
+        33: 33,
+
+        4:4,
+        12:12
+
+    }
+}
 
 '''
 
@@ -133,10 +172,20 @@ SAMPLE_REPLACE_VAL = {
 
 biome = ee.FeatureCollection(ASSET_ROI).filter('Bioma == "Amazônia"')
 
-tiles = ee.ImageCollection(ASSET_TILES).filterBounds(biome.geometry())
+tiles = ee.ImageCollection(ASSET_TILES).filterBounds(biome.geometry()).sort('tile', False)
 
-tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
-tiles_list = set(tiles_list)
+tiles_l = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+
+tiles_list_loaded = ee.ImageCollection(ASSET_OUTPUT)\
+    .filter('version == "2"')\
+    .reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+
+tiles_list_loaded = [int(x) for x in tiles_list_loaded]
+
+tiles_list = set([x for x in tiles_l if x not in tiles_list_loaded])
+
+df_areas = pd.read_csv(PATH_AREAS).replace(SAMPLE_REPLACE_VAL)\
+    .groupby(by=['tile','year','label'])['area'].sum().reset_index()
 
 
 '''
@@ -149,9 +198,7 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame, list_
 
     res = []
 
-    # balance samples based on stratified area
-    # df_areas = pd.read_csv(PATH_AREAS).query(f'year == {year} and tile == {tile}')
-    df_areas = pd.read_csv(PATH_AREAS).query(f'year == 2022 and tile == {tile}')
+    # balance samples based on stratified area    
     df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
     df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
 
@@ -170,20 +217,24 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame, list_
             
 
         # check samples available
-        sp_available = samples.query(f'label == {label}').shape[0]
+        try:
+            sp_available = df_samples_amazon.query(f'label == {label}').shape[0]
+        except Exception as e:
+            print('no samples available')
+            sp_available = 0
 
-        if sp_available > min_samples_area:
-            samples_selected = samples.query(f'label == {label}').sample(n=min_samples_area, replace=True)
+        if sp_available > min_samples_area and sp_available > 0:
+            samples_selected = df_samples_amazon.query(f'label == {label}').sample(n=min_samples_area)
         else:
             n_sp = int(min_samples_area - sp_available)
-
             samples_selected_plus = list_samples_df.query(f'label == {label}').sample(n=n_sp)
-            samples_selected_avail = samples.query(f'label == {label}').sample(n=sp_available)
-
-            samples_selected = pd.concat([samples_selected_avail, samples_selected_plus])
-
-
-        res.append(samples_selected)
+            samples_selected = samples_selected_plus
+ 
+        try:
+            res.append(samples_selected)
+        except Exception as e:
+            print(e)
+            continue
 
     # add samples to rare classes
     min_samples_gras = list_samples_df.query('label == 12').sample(n=15)
@@ -198,12 +249,14 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame, list_
     res.append(min_samples_agr)
     res.append(min_samples_water)
     res.append(min_samles_savana)
-    res.append(min_samles_forest)
+    res.append(min_samles_forest)#
 
-    samples_classification = pd.concat(res)
+    try:
+        samples_classification = pd.concat(res)
+    except Exception as e:
+        return None
 
     return samples_classification
-
 
 def get_features(tile, year):
 
@@ -334,22 +387,13 @@ def classify_data(tile, year):
         print('searching random samples')
         pass
 
-    list_random_sp = glob(f'{PATH_SAMPLES}/{year}/*')
-
-    list_gdf = []
-    for path_sp in random.sample(list_random_sp, 6):
-        try:
-            d = gpd.read_file(path_sp)
-            list_gdf.append(d)
-        except Exception as e:
-            pass
-
-    list_samples_df = pd.concat(list_gdf)
-
     samples_balanced = get_balanced_samples(
         balance=SAMPLE_PARAMS, 
-        samples=df_samples, list_samples_df=list_samples_df)
+        samples=df_samples, list_samples_df=df_samples_amazon)
     
+
+    if samples_balanced is None: return None
+
     samples_balanced = samples_balanced[['label', 'geometry', 'tile']]
 
     tiles_of_samples = samples_balanced['tile'].values.tolist()
@@ -461,9 +505,12 @@ def run(tile_list: list, year:int):
 
 for year in YEARS:
     
-    #tiles = list(glob(f'{PATH_DIR}\\data\\{year}\\*'))
-    #tiles = [x.split('\\') for x in tiles]
-    #tiles_list = [225066]
+    file_samples = []
+    for i in glob(f'{PATH_DIR}/data/{year}/*'):
+        try: file_samples.append(gpd.read_file(i)) 
+        except Exception as e: continue
+
+    df_samples_amazon = pd.concat(file_samples)
 
     for tile in tiles_list:
         result = classify_data(tile, year)

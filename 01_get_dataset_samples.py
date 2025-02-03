@@ -29,8 +29,8 @@ ee.Initialize(project=PROJECT)
 
 PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 
-# ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
-ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
+ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+# ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
@@ -38,8 +38,8 @@ ASSET_LULC = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas
 
 
 # this must be your partition raw fc samples
-ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col4_points_w_edge_and_edited_v1'
-# ASSET_SAMPLES =  'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_col3_points_w_edge_and_edited_v2_train_LA'
+# ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col4_points_w_edge_and_edited_v1'
+ASSET_SAMPLES =  'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_col3_points_w_edge_and_edited_v2_train_LA'
 
 
 LANDSAT_NEW_NAMES = [
@@ -81,30 +81,18 @@ ASSET_LANDSAT_IMAGES = {
 
 
 YEARS = [
-    # 1985
-    # 1985, 1986, 1987
-    # 1988, 1989, 1990, 1991, 
-    # 1992, 1993, 1994, 1995, 1996,
-    # 1997, 1998, 1999, 
-    # 2000, 2001, 2002,
-    # 2003, 2004, 
+    1985, 
+    # 1986, 1987
+    # 1988, 
+    # 1989, 1990, 1991, 1992, 
+    # 1993, 1994, 1995, 1996, 
+    # 1997, 1998, 1999, 2000, 
+    # 2001, 2002, 2003, 2004, 
     # 2005, 2006, 2007, 2008,
-    # 2009, 
-    # 2010, 
-    # 2011, 
-    # 2012, 
-    # 2013, 
-    # 2014,
-    # 2015, 
-    # 2016, 
-    # 2017, 
-    # 2018, 
-    # 2019, 
-    # 2020,
-    # 2021, 
-    # 2022, 
-    # 2023
-    2024
+    # 2009, 2010, 2011, 2012, 
+    # 2013, 2014, 2015, 2016, 
+    # 2017, 2018, 2019, 2020,
+    # 2021, 2022, 2023, 2024
 ]
 
 
@@ -215,15 +203,15 @@ MAX_REQUESTS_PER_SECOND = 100
 
 '''
 
-roi = ee.FeatureCollection(ASSET_ROI)\
-    .filter('Bioma == "Amazônia"'); 
+roi = ee.FeatureCollection(ASSET_ROI)#\
+    #.filter('Bioma == "Amazônia"'); 
 
 tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 
 samples = ee.FeatureCollection(ASSET_SAMPLES)\
-    .filterBounds(roi)
+    .filterBounds(roi)#\
     #.filter('AMOSTRAS == "Treinamento"')\
     
 

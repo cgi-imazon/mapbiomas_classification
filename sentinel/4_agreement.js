@@ -43,7 +43,7 @@ var agreement = yearsAgree.map(function(pairYears){
   
   
   
-  var pxArea =ee.Image.pixelArea().divide(10000);
+  var pxArea = ee.Image.pixelArea().divide(10000);
   
   var reducer = ee.Reducer.sum().group(1, 'label');
   
