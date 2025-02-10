@@ -32,7 +32,6 @@ ee.Initialize(project=PROJECT)
 '''
 
 PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
-# PATH_DIR = 'C:\\Imazon\\mapbiomas_classification'
 
 ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 # ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
@@ -42,15 +41,54 @@ ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 # PATH_SAMPLES = 'mapbiomas_classification\\data\\2024'
 PATH_SAMPLES = f'{PATH_DIR}/data'
 
-# PATH_AREAS = 'mapbiomas_classification\\data\\area\\areas_amazon.csv'
-# PATH_AREAS = f'{PATH_DIR}/data/area/areas_amazon.csv'
 PATH_AREAS = f'{PATH_DIR}/data/area/areas_la_1985_2022.csv'
 
 ASSET_CLASSIFICATION = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification'
 
 ASSET_OUTPUT = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/integrated'
 
-
+ASSETS_CLS_VERSIONS = {
+    'classification_p1': {
+        'id': 'projects/imazon-simex/LULC/classification',
+        'version': '2'
+    },
+    'classification_p2': {
+        'id': 'projects/imazon-simex/LULC/TEST/classification',
+        'version': ''
+    },
+    'classification_p3': {
+        'id': 'projects/imazon-simex/LULC/TEST/classification-2',
+        'version': '2'
+    },
+    'classification_p4': {
+        'id': 'projects/imazon-simex/LULC/COLLECTION7/classification',
+        'version': '4'
+    },
+    'classification_p5': {
+        'id': 'projects/imazon-simex/LULC/COLLECTION6/classification_review',
+        'version': '1'        
+    },
+    'classification_p6': {
+        'id': 'projects/imazon-simex/LULC/COLLECTION7/classification_review',
+        'version': ''
+    },
+    'classification_p7': {
+        'id': 'projects/imazon-simex/LULC/COLLECTION9/classification',
+        'version': ''
+    },
+    'classification_amz_legal_p1':{
+        'id': 'projects/imazon-simex/LULC/LEGAL_AMAZON/classification',
+        'version': ''
+    },
+    'classification_amz_legal_p2':{
+        'id': 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification',
+        'version': ''
+    },
+    'classification_amz_legal_p3':{
+        'id': 'projects/ee-mapbiomas-imazon/assets/mapbiomas/lulc_landsat/classification',
+        'version': ''
+    }
+}
 
 '''
     version 1: fetures from all sensors 
@@ -75,8 +113,7 @@ YEARS = [
     # 2024
 ]
 
-EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-
+# EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
 
 SAMPLE_REPLACE_VAL = {
     'label':{
@@ -123,26 +160,34 @@ SAMPLE_REPLACE_VAL = {
 FEATURE_SPACE = [
     'mode',
     #'mode_secondary',
-    #'transitions_total',
+
+    'transitions_total',
     'transitions_year',
-    #'distinct_total',
+    
+    'distinct_total',
     'distinct_year',
-    #'occurrence_agriculture_total',
+
+    'occurrence_agriculture_total',
     'occurrence_agriculture_year',
-    #'occurrence_forest_total',
+    
+    'occurrence_forest_total',
     'occurrence_forest_year',
-    #'occurrence_grassland_total',
+    
+    'occurrence_grassland_total',
     'occurrence_grassland_year',
-    #'occurrence_pasture_total',
+    
+    'occurrence_pasture_total',
     'occurrence_pasture_year',
-    #'occurrence_savanna_total',
+    
+    'occurrence_savanna_total',
     'occurrence_savanna_year',
-    #'occurrence_water_total',
+    
+    'occurrence_water_total',
     'occurrence_water_year'
 ]
 
 MODEL_PARAMS = {
-    'numberOfTrees': 60,
+    'numberOfTrees': 50,
     # 'variablesPerSplit': 4,
     # 'minLeafPopulation': 25
 }
@@ -166,6 +211,9 @@ SAMPLE_REPLACE_VAL = {
         11: 12
     }
 }
+
+
+
 
 '''
 
@@ -196,9 +244,96 @@ df_areas = pd.read_csv(PATH_AREAS).replace(SAMPLE_REPLACE_VAL)\
     Function to Export
 
 '''
+def setName(image):
+    return image.set('name', ee.String(image.get('system:index')).slice(0, 20))
 
-def get_classification():
-    pass
+def get_classification(geometry):
+    collection1 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p1']['id'])\
+        .filter(ee.Filter.eq("version", ASSETS_CLS_VERSIONS['classification_p1']['version']))\
+        .filter(ee.Filter.bounds(geometry))\
+        .map(setName)
+
+    collection2 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p2']['id'])\
+        .filter(ee.Filter.bounds(geometry))\
+        .map(setName)
+
+    collection3 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p3']['id'])\
+        .filter(ee.Filter.eq("version", ASSETS_CLS_VERSIONS['classification_p3']['version']))\
+        .filter(ee.Filter.bounds(geometry))\
+        .map(setName)
+
+    collection4 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p4']['id'])\
+        .filter(ee.Filter.eq("version", ASSETS_CLS_VERSIONS['classification_p4']['version']))\
+        .filter(ee.Filter.bounds(geometry))\
+        .map(setName)
+
+    collection5 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p5']['id'])\
+        .filter(ee.Filter.eq("version", ASSETS_CLS_VERSIONS['classification_p5']['version']))\
+        .filter(ee.Filter.bounds(geometry))\
+        .map(setName)
+
+    collection6 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p6']['id'])\
+        .filter(ee.Filter.bounds(geometry))\
+        .map(setName)
+
+    collection7 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p7']['id'])\
+        .filter(ee.Filter.bounds(geometry))\
+        .map(setName)
+    
+
+
+    collection_amz_legal_p1 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_amz_legal_p1']['id'])\
+        .filter(ee.Filter.bounds(geometry))
+        
+    collection_amz_legal_p2 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_amz_legal_p2']['id'])\
+        .filter(ee.Filter.bounds(geometry))
+
+    collection_amz_legal_p3 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_amz_legal_p3']['id'])\
+        .filter(ee.Filter.bounds(geometry))
+
+
+
+    collection5 = collection5\
+        .filter(ee.Filter.inList("name", collection6.aggregate_array('name')).Not())
+
+    collectionFinal = collection6.merge(collection5)
+
+    collection4 = collection4\
+        .filter(ee.Filter.inList("name", collectionFinal.aggregate_array('name')).Not())
+
+    ###
+    collectionFinal = collectionFinal.merge(collection4)
+
+    collection3 = collection3\
+        .filter(ee.Filter.inList("name", collectionFinal.aggregate_array('name')).Not())
+
+    collectionFinal = collectionFinal.merge(collection3)
+
+    collection2 = collection2\
+        .filter(ee.Filter.inList("name", collectionFinal.aggregate_array('name')).Not())
+
+    collectionFinal = collectionFinal.merge(collection2)
+
+    collection1 = collection1\
+        .filter(ee.Filter.inList("name", collectionFinal.aggregate_array('name')).Not())
+
+    collectionFinal = collectionFinal.merge(collection1)
+
+    # data 2023
+    collectionFinal = collectionFinal.merge(collection7)\
+        .merge(collection_amz_legal_p1)\
+        .merge(collection_amz_legal_p2)\
+        .merge(collection_amz_legal_p3)
+
+    # Remap classes
+    collectionFinal = collectionFinal.map(
+        lambda image: image.where(image.eq(19), 18)
+        .where(image.eq(13), 12)
+        .where(image.eq(25), 15)
+        .selfMask()
+    )
+
+    return collectionFinal
 
 def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame, list_samples_df):
 
@@ -272,73 +407,146 @@ def get_features(tile, year):
 
     center = roi.centroid()
 
-    classification_year = ee.ImageCollection(ASSET_CLASSIFICATION)\
-        .filter(f'version == "1" and year == {year}')\
-        .select('classification')\
-        .filterBounds(center)
+    #classification_year = ee.ImageCollection(ASSET_CLASSIFICATION)\
+    #    .filter(f'version == "1" and year == {year}')\
+    #    .select(0)\
+    #    .filterBounds(center)
 
+    classification_tile = get_classification(center).select(0)
+
+    classification_year = classification_tile.filter(f'year == {year}')
 
 
     # get metrics
 
     #
+    n_observations_total = classification_tile\
+        .map(lambda image: image.gt(0).unmask(0))\
+        .reduce(ee.Reducer.sum())\
+        .rename('observations_total')
+    
     n_observations_year = classification_year\
         .map(lambda image: image.gt(0).unmask(0))\
         .reduce(ee.Reducer.sum())\
         .rename('observations_year')
 
+
+
     #
+    transitions_total = classification_tile\
+        .reduce(ee.Reducer.countRuns())\
+        .divide(n_observations_total)\
+        .rename('transitions_total')
+    
     transitions_year = classification_year\
         .reduce(ee.Reducer.countRuns())\
         .divide(n_observations_year)\
         .rename('transitions_year')
 
+
+
     #
+    distinct_total = classification_tile\
+        .reduce(ee.Reducer.countDistinctNonNull())\
+        .rename('distinct_total')
+    
     distinct_year = classification_year\
         .reduce(ee.Reducer.countDistinctNonNull())\
         .rename('distinct_year')
+    
+
     
     # mode
     mode_year = classification_year\
         .reduce(ee.Reducer.mode())\
         .rename('mode')
+    
 
-    # occurrence in the year
+
+    forest_total = classification_tile\
+        .map(lambda image: image.eq(3))\
+        .reduce(ee.Reducer.sum())\
+        .divide(n_observations_total)\
+        .rename('occurrence_forest_total')
+
     forest_year = classification_year\
         .map(lambda image: image.eq(3))\
         .reduce(ee.Reducer.sum())\
         .divide(n_observations_year)\
         .rename('occurrence_forest_year')
 
+
+
     # occurrence savanna 
+    savanna_total = classification_tile\
+        .map(lambda image: image.eq(4))\
+        .reduce(ee.Reducer.sum())\
+        .divide(n_observations_total)\
+        .rename('occurrence_savanna_total')
+
     savanna_year = classification_year\
         .map(lambda image: image.eq(4))\
         .reduce(ee.Reducer.sum())\
         .divide(n_observations_year)\
         .rename('occurrence_savanna_year')
     
+
+
     # occurrence grass 
+    grassland_total = classification_tile\
+        .map(lambda image: image.eq(12))\
+        .reduce(ee.Reducer.sum())\
+        .divide(n_observations_total)\
+        .rename('occurrence_grassland_total')
+    
     grassland_year = classification_year\
         .map(lambda image: image.eq(12))\
         .reduce(ee.Reducer.sum())\
         .divide(n_observations_year)\
         .rename('occurrence_grassland_year')
 
+
+
+
     # occurrence pasture
+    pasture_total = classification_tile\
+        .map(lambda image: image.eq(15))\
+        .reduce(ee.Reducer.sum())\
+        .divide(n_observations_total)\
+        .rename('occurrence_pasture_total')
+    
     pasture_year = classification_year\
         .map(lambda image: image.eq(15))\
         .reduce(ee.Reducer.sum())\
         .divide(n_observations_year)\
         .rename('occurrence_pasture_year')
 
+
+
+
     # occurrence agriculture
+    agriculture_total = classification_tile\
+        .map(lambda image: image.eq(18))\
+        .reduce(ee.Reducer.sum())\
+        .divide(n_observations_total)\
+        .rename('occurrence_agriculture_total')
+    
+
     agriculture_year = classification_year\
         .map(lambda image: image.eq(18))\
         .reduce(ee.Reducer.sum())\
         .divide(n_observations_year)\
         .rename('occurrence_agriculture_year')
+    
+
 
     # occurrence water year
+    water_total = classification_tile\
+        .map(lambda image: image.eq(33))\
+        .reduce(ee.Reducer.sum())\
+        .divide(n_observations_total)\
+        .rename('occurrence_water_total')
+
     water_year = classification_year\
         .map(lambda image: image.eq(33))\
         .reduce(ee.Reducer.sum())\
@@ -358,8 +566,18 @@ def get_features(tile, year):
         .addBands(grassland_year)\
         .addBands(pasture_year)\
         .addBands(agriculture_year)\
-        .addBands(water_year)
-        
+        .addBands(water_year)\
+        .addBands(transitions_total)\
+        .addBands(distinct_total)\
+        .addBands(n_observations_total)\
+        .addBands(forest_total)\
+        .addBands(savanna_total)\
+        .addBands(grassland_total)\
+        .addBands(pasture_total)\
+        .addBands(agriculture_total)\
+        .addBands(water_total)
+
+
     return image, roi
 
 def get_sample_values(samples, tiles, year):
