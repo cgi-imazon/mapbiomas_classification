@@ -487,22 +487,6 @@ def classify_data(tile, year):
 
     return f'success exporting tile {tile}'
 
-def run(tile_list: list, year:int):
-
-    future_to_point = {EXECUTOR.submit(get_dataset, tile_id, year): tile_id for tile_id in tile_list}
-
-    for future in concurrent.futures.as_completed(future_to_point):
-        point = future_to_point[future]
-
-        result = future.result()
-
-
-        if result is None: 
-            print('error - exporting ')
-            continue
-        
-        print(result)
-
 '''
     
     Iteration
