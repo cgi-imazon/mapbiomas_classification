@@ -34,8 +34,8 @@ ee.Initialize(project=PROJECT)
 PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 # PATH_DIR = 'C:\\Imazon\\mapbiomas_classification'
 
-# ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
-ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
+ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+# ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
@@ -43,7 +43,8 @@ ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 PATH_SAMPLES = f'{PATH_DIR}/data'
 
 # PATH_AREAS = 'mapbiomas_classification\\data\\area\\areas_amazon.csv'
-PATH_AREAS = f'{PATH_DIR}/data/area/areas_amazon.csv'
+# PATH_AREAS = f'{PATH_DIR}/data/area/areas_amazon.csv'
+PATH_AREAS = f'{PATH_DIR}/data/area/areas_la_1985_2022.csv'
 
 ASSET_CLASSIFICATION = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification'
 
@@ -68,8 +69,10 @@ YEARS = [
     # 2005, 2006, 2007, 2008,
     # 2009, 2010, 2011, 2012, 2013, 2014,
     # 2015, 2016, 2017, 2018, 2019, 2020,
-    # 2021, 2022, 2023
-    2024
+    # 2021, 
+    2022, 
+    # 2023
+    # 2024
 ]
 
 EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -193,6 +196,9 @@ df_areas = pd.read_csv(PATH_AREAS).replace(SAMPLE_REPLACE_VAL)\
     Function to Export
 
 '''
+
+def get_classification():
+    pass
 
 def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame, list_samples_df):
 
@@ -413,9 +419,9 @@ def classify_data(tile, year):
     sp = get_sample_values(samples, tiles_of_samples, year)
 
     # classify
-    classifier_prob = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
-        .setOutputMode('MULTIPROBABILITY')\
-        .train(sp, 'label', FEATURE_SPACE)
+    # classifier_prob = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
+    #     .setOutputMode('MULTIPROBABILITY')\
+    #     .train(sp, 'label', FEATURE_SPACE)
     
     classifier = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
         .train(sp, 'label', FEATURE_SPACE)
