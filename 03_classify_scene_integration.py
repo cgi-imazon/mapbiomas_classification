@@ -45,7 +45,7 @@ PATH_AREAS = f'{PATH_DIR}/data/area/areas_la_1985_2022.csv'
 
 ASSET_CLASSIFICATION = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification'
 
-ASSET_OUTPUT = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/integrated'
+ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/mapbiomas/lulc_landsat/integrated'
 
 ASSETS_CLS_VERSIONS = {
     'classification_p1': {
@@ -221,19 +221,9 @@ SAMPLE_REPLACE_VAL = {
 
 '''
 
-biome = ee.FeatureCollection(ASSET_ROI).filter('Bioma == "Amazônia"')
+roi_fc = ee.FeatureCollection(ASSET_ROI)#.filter('Bioma == "Amazônia"')
 
-tiles = ee.ImageCollection(ASSET_TILES).filterBounds(biome.geometry()).sort('tile', False)
-
-tiles_l = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
-
-tiles_list_loaded = ee.ImageCollection(ASSET_OUTPUT)\
-    .filter('version == "2"')\
-    .reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
-
-tiles_list_loaded = [int(x) for x in tiles_list_loaded]
-
-tiles_list = set([x for x in tiles_l if x not in tiles_list_loaded])
+tiles = ee.ImageCollection(ASSET_TILES)
 
 df_areas = pd.read_csv(PATH_AREAS).replace(SAMPLE_REPLACE_VAL)\
     .groupby(by=['tile','year','label'])['area'].sum().reset_index()
@@ -712,15 +702,31 @@ def classify_data(tile, year):
 '''
 
 for year in YEARS:
+
+
+    tiles_list = tiles\
+        .filterBounds(roi_fc.geometry()).sort('tile', False)\
+        .reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+
+    tiles_list_loaded = ee.ImageCollection(ASSET_OUTPUT)\
+        .filter(f'version == "2" and year == {str(year)}')\
+        .reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
     
+    tiles_list_target = set(tiles_list) - set(tiles_list_loaded)
+
     file_samples = []
     for i in glob(f'{PATH_DIR}/data/{year}/*'):
-        try: file_samples.append(gpd.read_file(i)) 
-        except Exception as e: continue
+        try:
+            print(i) 
+            file_samples.append(gpd.read_file(i)) 
+        except Exception as e: 
+            print(e)
+            continue
 
     df_samples_amazon = pd.concat(file_samples)
 
-    for tile in tiles_list:
+    for tile in tiles_list_target:
+        print(tile)
         result = classify_data(tile, year)
 
         if result is None: 
