@@ -321,6 +321,7 @@ listParams.forEach(function(params){
             .map(removeCloud)
             .map(getFractions)
             .map(getNdfi)
+            .select(['ndfi'])
      
             
         var startTm = String((year - (dictParams['time_window']) + 1))  + '-01-01';

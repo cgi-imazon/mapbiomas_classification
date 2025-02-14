@@ -186,7 +186,7 @@ tilesList = [226068]
 # Loop pelos anos e parâmetros
 for params in listParams:
     year = params[0]
-    lulc = ee.Image(assetLulc).select('classification_' + str(year))
+    lulc = ee.Image(assetLulc).select('classification_2023')
 
     start = f"{year}-01-01"
     end = f"{year}-12-30"
@@ -201,7 +201,8 @@ for params in listParams:
         collectionTarget = getCollection(start, end, 100, center)\
             .map(removeCloud)\
             .map(getFractions)\
-            .map(getNdfi)
+            .map(getNdfi)\
+            .select(['ndfi'])
 
         startTm = f"{year - dictParams['time_window'] + 1}-01-01"
         endTm = f"{year - 1}-01-01"
