@@ -20,12 +20,12 @@ var defaultParams = {
     'tresh_dam_min': -0.250,
     'tresh_dam_max': -0.095,
     //'cloud_tresh': 2, // treshould to mask clouds. It is very sensitive to results,
-    'time_window': 2
+    'time_window': 3
 }
 
 var listParams = [
-    //[2024, defaultParams],
-    [2023, defaultParams],
+    [2024, defaultParams],
+    // [2023, defaultParams],
     // [2021, defaultParams],
     // [2020, defaultParams],
     // [2019, defaultParams],
@@ -397,13 +397,7 @@ listParams.forEach(function(params){
           scale: 30, 
           maxPixels:1e13
         })
-        
-        
-      
-      
     });
-
-    
 });
 
 
