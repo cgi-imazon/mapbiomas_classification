@@ -11,14 +11,52 @@ version = '1'
 default_params = {
     'tresh_dam_min': -0.250,
     'tresh_dam_max': -0.095,
-    'time_window': 2
+    'time_window': 3
 }
 
 list_params = [
-    [2023, default_params]
+    [2024, default_params],
+    #[2023, default_params],
+    #[2022, default_params],
+    #[2021, default_params],
+    #[2020, default_params],
+    #[2019, default_params],
+    #[2018, default_params],
+    #[2017, default_params],
+    #[2016, default_params],
+    #[2015, default_params],
+    #[2014, default_params],
+    #[2013, default_params],
+    #[2012, default_params],
+    #[2011, default_params],
+    #[2010, default_params],
+    #[2009, default_params],
+    #[2008, default_params],
+    #[2007, default_params],
+    #[2006, default_params],
+#
+    #[2005, default_params],
+    #[2004, default_params],
+    #[2003, default_params],
+    #[2002, default_params],
+    #[2001, default_params],
+    #[2000, default_params],
+    #[1999, default_params],
+    #[1998, default_params],
+    #[1997, default_params],
+    #[1996, default_params],
+    #[1995, default_params],
+    #[1994, default_params],
+    #[1993, default_params],
+    #[1992, default_params],
+    #[1991, default_params],
+    #[1990, default_params],
+    #[1989, default_params],
+    #[1988, default_params],
+    #[1987, default_params],
+    #[1986, default_params],
+    #[1985, default_params]
 ]
-
-months = ['01','02','03','04','05','06','07','08','09','10','11']
 
 # Funções auxiliares
 def get_collection(date_start, date_end, cloud_cover, roi):
@@ -114,11 +152,16 @@ def remove_cloud(image):
 # Processamento principal
 regions = ee.FeatureCollection(asset_roi).filter(ee.Filter.eq('Bioma', 'Amazônia'))
 tiles = ee.ImageCollection(asset_tiles).filterBounds(regions.geometry())
-tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+#tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+#tiles_list = set(tiles_list)
+
+tiles_list = [226068]
+
+
 
 for params in list_params:
     year, param_dict = params[0], params[1]
-    lulc = ee.Image(asset_lulc).select(f'classification_{year}')
+    lulc = ee.Image(asset_lulc).select(f'classification_2023')
     
     for grid in tiles_list:
         tile_img = ee.ImageCollection(asset_tiles).filter(ee.Filter.eq('tile', grid)).first()
@@ -145,11 +188,10 @@ for params in list_params:
         median_monthly = time_coll.select('ndfi').reduce(ee.Reducer.median()).rename('metric')
         
         # Calcular desvios
-        collection_deviations = target_coll.map(lambda img: 
-            img.select('ndfi')
-            .subtract(median_monthly)
-            .updateMask(median_monthly.gt(0.8))
-            .updateMask(lulc.eq(3))
+        collection_deviations = target_coll.select('ndfi').map(lambda img: 
+            img.subtract(median_monthly)
+            .mask(median_monthly.gt(0.8))
+            .mask(lulc.eq(3))
             .rename('deviation')
             .copyProperties(img))
         
