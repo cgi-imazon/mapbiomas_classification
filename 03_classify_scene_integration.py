@@ -106,9 +106,11 @@ YEARS = [
     # 2003, 2004, 
     # 2005, 2006, 2007, 2008,
     # 2009, 2010, 2011, 2012, 2013, 2014,
-    # 2015, 2016, 2017, 2018, 2019, 2020,
+    2015, 
+    #2016, 2017, 2018, 
+    # 2019, 2020,
     # 2021, 
-    2022, 
+    # 2022, 
     # 2023
     # 2024
 ]
@@ -158,33 +160,36 @@ SAMPLE_REPLACE_VAL = {
 '''
 
 FEATURE_SPACE = [
-    'mode',
-    #'mode_secondary',
-
-    'transitions_total',
-    'transitions_year',
+    'distinct_total', 
+    'distinct_year', 
     
-    'distinct_total',
-    'distinct_year',
-
-    'occurrence_agriculture_total',
+    'mode', 
+    
+    'observations_total',
+    'observations_year', 
+    
+    'occurrence_agriculture_total', 
     'occurrence_agriculture_year',
     
-    'occurrence_forest_total',
-    'occurrence_forest_year',
+    'occurrence_forest_total', 
+    'occurrence_forest_year', 
     
     'occurrence_grassland_total',
-    'occurrence_grassland_year',
+    'occurrence_grassland_year', 
     
-    'occurrence_pasture_total',
+    'occurrence_pasture_total', 
     'occurrence_pasture_year',
     
-    'occurrence_savanna_total',
-    'occurrence_savanna_year',
+    'occurrence_savanna_total', 
+    'occurrence_savanna_year', 
     
     'occurrence_water_total',
-    'occurrence_water_year'
+    'occurrence_water_year', 
+    
+    'transitions_total', 
+    'transitions_year'
 ]
+
 
 MODEL_PARAMS = {
     'numberOfTrees': 50,
@@ -192,7 +197,7 @@ MODEL_PARAMS = {
     # 'minLeafPopulation': 25
 }
 
-N_SAMPLES = 3000
+N_SAMPLES = 3500
 
 
 SAMPLE_PARAMS = pd.DataFrame([
@@ -201,7 +206,7 @@ SAMPLE_PARAMS = pd.DataFrame([
     {'label': 12, 'min_samples': N_SAMPLES * 0.10},
     {'label': 15, 'min_samples': N_SAMPLES * 0.20},
     {'label': 18, 'min_samples': N_SAMPLES * 0.10},
-    {'label': 25, 'min_samples': N_SAMPLES * 0.15},
+    {'label': 25, 'min_samples': N_SAMPLES * 0.05},
     {'label': 33, 'min_samples': N_SAMPLES * 0.15},
 ])
 
@@ -307,13 +312,14 @@ def get_classification(geometry):
     collection1 = collection1\
         .filter(ee.Filter.inList("name", collectionFinal.aggregate_array('name')).Not())
 
-    collectionFinal = collectionFinal.merge(collection1)
-
-    # data 2023
-    collectionFinal = collectionFinal.merge(collection7)\
+    collectionFinal = collectionFinal.merge(collection1)\
         .merge(collection_amz_legal_p1)\
         .merge(collection_amz_legal_p2)\
         .merge(collection_amz_legal_p3)
+    
+    # data 2023
+    collectionFinal = collectionFinal.merge(collection7)\
+
 
     # Remap classes
     collectionFinal = collectionFinal.map(
@@ -567,7 +573,6 @@ def get_features(tile, year):
         .addBands(agriculture_total)\
         .addBands(water_total)
 
-
     return image, roi
 
 def get_sample_values(samples, tiles, year):
@@ -622,7 +627,7 @@ def classify_data(tile, year):
         print('error at getting samples')
         return None
 
-    image, roi = get_features(tile, year)
+    image_fs, roi = get_features(tile, year)
 
     sp = get_sample_values(samples, tiles_of_samples, year)
 
@@ -630,18 +635,19 @@ def classify_data(tile, year):
     # classifier_prob = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
     #     .setOutputMode('MULTIPROBABILITY')\
     #     .train(sp, 'label', FEATURE_SPACE)
+
     
     classifier = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
         .train(sp, 'label', FEATURE_SPACE)
 
 
 
-    classification = ee.Image(image
+    classification = ee.Image(image_fs
         .classify(classifier)
         .rename(['classification'])
-        .copyProperties(image)
-        .copyProperties(image, ['system:footprint'])
-        .copyProperties(image, ['system:time_start'])
+        .copyProperties(image_fs)
+        .copyProperties(image_fs, ['system:footprint'])
+        .copyProperties(image_fs, ['system:time_start'])
     )
 
     #probabilities = ee.Image(image
@@ -717,7 +723,6 @@ for year in YEARS:
     file_samples = []
     for i in glob(f'{PATH_DIR}/data/{year}/*'):
         try:
-            print(i) 
             file_samples.append(gpd.read_file(i)) 
         except Exception as e: 
             print(e)
@@ -726,8 +731,10 @@ for year in YEARS:
     df_samples_amazon = pd.concat(file_samples)
 
     for tile in tiles_list_target:
-        print(tile)
+    
         result = classify_data(tile, year)
+
+        print(result)
 
         if result is None: 
             print('error - exporting ')
