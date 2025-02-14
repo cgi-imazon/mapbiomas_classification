@@ -102,34 +102,14 @@ def get_fractions(image):
 def get_ndfi(image):
     summed = image.expression('b("gv") + b("npv") + b("soil")')
     gvs = image.select('gv').divide(summed).rename('gvs')
-    ndfi = ee.Image.cat(gvs, summed.subtract(gvs))\
-                  .normalizedDifference()\
-                  .rename('ndfi')\
-                  .clamp(-1, 1)
+    npv_soil = summed.subtract(gvs)
+    ndfi = ee.Image.cat(gvs, npv_soil).normalizedDifference().rename('ndfi').clamp(-1, 1)
     return image.addBands(gvs).addBands(ndfi)
 
 def remove_cloud(image):
     qa = image.select('pixel_qa')
     mask = qa.bitwiseAnd(1 << 3).eq(0).And(qa.bitwiseAnd(1 << 4).eq(0))
     return image.updateMask(mask).copyProperties(image)
-
-def remove_cloud_shadow(image):
-    qa = image.select('qa_pixel')
-    cloud_threshold = image.select('cloud').lt(0.025)
-    
-    cond = cloud_threshold
-    kernel = ee.Kernel.euclidean(60, 'meters')
-    proximity = cond.distance(kernel, False)
-    
-    cond = cond.where(proximity.gt(0), 0)
-    image = image.updateMask(cond)
-    
-    proximity = image.select('ndfi').unmask(-1).eq(-1).distance(kernel, False)
-    cond = cond.where(proximity.gt(0), 0)
-    return image.updateMask(cond)
-
-def create_time_band(image):
-    return image.addBands(image.metadata('system:time_start').divide(1e18))
 
 # Processamento principal
 regions = ee.FeatureCollection(asset_roi).filter(ee.Filter.eq('Bioma', 'Amazônia'))
@@ -141,7 +121,7 @@ for params in list_params:
     lulc = ee.Image(asset_lulc).select(f'classification_{year}')
     
     for grid in tiles_list:
-        tile_img = ee.Image(asset_tiles).filter(ee.Filter.eq('tile', grid)).first()
+        tile_img = ee.ImageCollection(asset_tiles).filter(ee.Filter.eq('tile', grid)).first()
         roi = tile_img.geometry()
         center = roi.centroid()
         
@@ -151,67 +131,43 @@ for params in list_params:
                       .map(get_fractions)
                       .map(get_ndfi))
         
-        # Janela temporal
+        # Processar janela temporal
         start_tm = f"{year - param_dict['time_window'] + 1}-01-01"
-        end_tm = f"{year - 1}-12-31"
+        end_tm = f"{year - 1}-01-01"
         
-        # Processar desvios mensais
-        deviations = []
-        for month in months:
-            m = int(month)
-            # Coleção de referência
-            time_coll = (get_collection(start_tm, end_tm, 100, roi)
-                         .map(remove_cloud)
-                         .filter(ee.Filter.calendarRange(m, m, 'month'))
-                         .map(get_fractions)
-                         .map(get_ndfi))
-            
-            # Lógica condicional
-            condition = ee.Algorithms.If(
-                time_coll.size().eq(0),
-                ee.List([]),
-                ee.Algorithms.If(
-                    target_coll.select('ndfi').filter(ee.Filter.calendarRange(m, m, 'month')).size().eq(0),
-                    ee.List([]),
-                    ee.List(  # Adicionar conversão explícita para lista
-                        time_coll.select('ndfi')
-                        .reduce(ee.Reducer.median())
-                        .rename('metric')
-                        .map(lambda median:  
-                            target_coll.select('ndfi')
-                            .filter(ee.Filter.calendarRange(m, m, 'month'))
-                            .map(lambda img: 
-                                img.subtract(median)
-                                .updateMask(median.gt(0.8))
-                                .updateMask(lulc.eq(3))
-                                .rename('deviation')
-                            )
-                        ).flatten()  # Achatar a lista de listas
-                    )
-                )
-            )
-            deviations.append(condition)
+        # Coleção de referência
+        time_coll = (get_collection(start_tm, end_tm, 100, roi)
+                     .map(remove_cloud)
+                     .map(get_fractions)
+                     .map(get_ndfi))
         
-        # Consolidar resultados
-        col_deviation = ee.ImageCollection(ee.List(deviations).flatten())
+        # Calcular mediana
+        median_monthly = time_coll.select('ndfi').reduce(ee.Reducer.median()).rename('metric')
+        
+        # Calcular desvios
+        collection_deviations = target_coll.map(lambda img: 
+            img.select('ndfi')
+            .subtract(median_monthly)
+            .updateMask(median_monthly.gt(0.8))
+            .updateMask(lulc.eq(3))
+            .rename('deviation')
+            .copyProperties(img))
         
         # Calcular danos
-        col_dam = col_deviation.map(lambda img: 
+        col_dam = collection_deviations.map(lambda img: 
             img.expression('b("deviation") >= min && b("deviation") <= max', {
                 'deviation': img.select('deviation'),
                 'min': param_dict['tresh_dam_min'],
                 'max': param_dict['tresh_dam_max']
-            }).rename('dam'))
+            }))
         
-        # Estatísticas finais
+        # Soma total de danos
         sum_dam = col_dam.sum()
-        valid_obs = col_deviation.map(lambda img: img.unmask(100).neq(100)).sum()
-        final_result = sum_dam.divide(valid_obs).rename('dam_freq')
         
         # Exportar
         export_name = f'DAM_{year}_{grid}_{version}'
         task = ee.batch.Export.image.toAsset(
-            image=final_result,
+            image=sum_dam,
             description=export_name,
             assetId=f'{asset_output}/{export_name}',
             region=roi,

@@ -327,53 +327,23 @@ listParams.forEach(function(params){
         var endTm = String(year - 1)  + '-01-01';
         
         
-        
-        
-        
-        var deviations = months.map(function(m) {
-            var monthInt = parseInt(m);
-        
-            var collectionTimeWin = getCollection(startTm, endTm, 100, roi)
-                .map(removeCloud)
-                .filter(ee.Filter.calendarRange(monthInt, monthInt, 'month'))
-                .map(getFractions)
-                .map(getNdfi);
-      
-        
-            // Se a coleção estiver vazia, retorna uma lista vazia e interrompe a execução
-            return ee.Algorithms.If(
-                collectionTimeWin.size().eq(0),
-                ee.List([]),
-                ee.Algorithms.If(
-                    collectionTarget.select('ndfi').filter(ee.Filter.calendarRange(monthInt, monthInt, 'month')).size().eq(0),
-                    ee.List([]),
-                    (function() {
-                        var medianMonthly = collectionTimeWin.select('ndfi').reduce(ee.Reducer.median()).rename('metric');
-        
-                        var collectionMonthly = collectionTarget.select('ndfi')
-                            .filter(ee.Filter.calendarRange(monthInt, monthInt, 'month'));
-        
-        
-                        var collectionDeviations = collectionMonthly.map(function(img) {
-                            var deviation = img.subtract(medianMonthly)
-                                .updateMask(medianMonthly.gt(0.80))
-                                .updateMask(lulc.eq(3))
-                                .rename('deviation');
-                            return deviation.copyProperties(img);
-                        });
-        
-                        return collectionDeviations.toList(collectionDeviations.size());
-                    })()
-                )
-            );
+        var collectionTimeWin = getCollection(startTm, endTm, 100, roi)
+            .map(removeCloud)
+            .map(getFractions)
+            .map(getNdfi);
+
+        var medianMonthly = collectionTimeWin.select('ndfi').reduce(ee.Reducer.median()).rename('metric');
+
+        var collectionDeviations = collectionTarget.map(function(img) {
+            var deviation = img.subtract(medianMonthly)
+                .updateMask(medianMonthly.gt(0.80))
+                .updateMask(lulc.eq(3))
+                .rename('deviation');
+            return deviation.copyProperties(img);
         });
+
         
-        
-        var colDeviation = ee.ImageCollection(ee.List(deviations).flatten())//.filter(ee.Filter.gt('system:time_start', 1704067200000));
-        
-        
-        
-        var colDam = colDeviation.map(function(image){
+        var colDam = collectionDeviations.map(function(image){
           return image.expression('deviation >= min && deviation <= max', {
             'deviation': image.select('deviation'),
             'min': dictParams['tresh_dam_min'],
@@ -390,13 +360,26 @@ listParams.forEach(function(params){
         //var sumDeviation = colDeviation.sum();
         
         var sumDam = colDam.sum();
+        
       
         //
-        var validObservations = colDeviation.map(function(img) {
-            return img.unmask(100).neq(100); // Conta somente valores válidos (não nulos)
-        }).sum();
-                
-        var colDamNorm = sumDam.divide(validObservations)//.multiply(100).byte();        
+        //var validObservations = colDeviation.map(function(img) {
+        //    return img.unmask(100).neq(100); // Conta somente valores válidos (não nulos)
+        //}).sum();
+        
+      
+        //var normalizedDeviation = sumDeviation.divide(validObservations);
+        
+        //var colDamNorm = sumDam.divide(validObservations)//.multiply(100).byte();
+    
+        /*
+        Map.addLayer(colDamNorm.selfMask(), {
+         // min:6, max:75,
+          min:0, max:0.7,
+          palette:palettes.cmocean.Thermal[7]
+        }, 'freq dam');
+        */
+        
         
         // export session
         var name =  'DAM_' + year.toString() + '_' +  grid.toString() + '_' + version
@@ -414,7 +397,13 @@ listParams.forEach(function(params){
           scale: 30, 
           maxPixels:1e13
         })
-    });  
+        
+        
+      
+      
+    });
+
+    
 });
 
 
