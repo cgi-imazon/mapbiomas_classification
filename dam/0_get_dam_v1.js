@@ -63,9 +63,6 @@ var listParams = [
     // [1987, defaultParams],
 ]
 
-var months = ['01','02','03','04','05', '06', '07','08', '09','10', '11']
-
-
 // get collection
 function getCollection(dateStart, dateEnd, cloudCover, roi) {
   
