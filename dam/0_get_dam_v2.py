@@ -6,16 +6,16 @@ asset_lulc = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas
 asset_tiles = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 asset_roi = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 asset_output = 'projects/ee-mapbiomas-imazon/assets/degradation/dam-frequency-c2'
-version = '1'
+version = '2'
 
 default_params = {
     'tresh_dam_min': -0.250,
     'tresh_dam_max': -0.095,
-    'time_window': 2
+    'time_window': 3
 }
 
 list_params = [
-    [2023, default_params]
+    [2024, default_params]
 ]
 
 months = ['01','02','03','04','05','06','07','08','09','10','11']
@@ -131,17 +131,39 @@ def remove_cloud_shadow(image):
 def create_time_band(image):
     return image.addBands(image.metadata('system:time_start').divide(1e18))
 
+def calculate_deviations(collection_time_win, collection_target, month_int, lulc):
+    # Calcula a mediana mensal da coleção no tempo de referência
+    median_monthly = collection_time_win.select('ndfi').reduce(ee.Reducer.median()).rename('metric')
+    
+    # Filtra a coleção alvo pelo mês específico
+    collection_monthly = collection_target.select('ndfi').filter(ee.Filter.calendarRange(month_int, month_int, 'month'))
+    
+    # Função para calcular a diferença entre a imagem e a mediana mensal
+    def compute_deviation(img):
+        deviation = img.subtract(median_monthly) \
+            .updateMask(median_monthly.gt(0.80)) \
+            .updateMask(lulc.eq(3)) \
+            .rename('deviation')
+        return deviation.copyProperties(img)
+    
+    # Aplica a função a cada imagem da coleção
+    collection_deviations = collection_monthly.map(compute_deviation)
+    
+    return collection_deviations.toList(collection_deviations.size())
+
 # Processamento principal
 regions = ee.FeatureCollection(asset_roi).filter(ee.Filter.eq('Bioma', 'Amazônia'))
 tiles = ee.ImageCollection(asset_tiles).filterBounds(regions.geometry())
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+tiles_list = set(tiles_list)
+#tiles_list = [226068]
 
 for params in list_params:
     year, param_dict = params[0], params[1]
-    lulc = ee.Image(asset_lulc).select(f'classification_{year}')
+    lulc = ee.Image(asset_lulc).select(f'classification_2023')
     
     for grid in tiles_list:
-        tile_img = ee.Image(asset_tiles).filter(ee.Filter.eq('tile', grid)).first()
+        tile_img = ee.Image(tiles.filter(ee.Filter.eq('tile', grid)).first())
         roi = tile_img.geometry()
         center = roi.centroid()
         
@@ -149,7 +171,8 @@ for params in list_params:
         target_coll = (get_collection(f'{year}-01-01', f'{year}-12-30', 100, center)
                       .map(remove_cloud)
                       .map(get_fractions)
-                      .map(get_ndfi))
+                      .map(get_ndfi)
+                      .select(['ndfi']))
         
         # Janela temporal
         start_tm = f"{year - param_dict['time_window'] + 1}-01-01"
@@ -164,30 +187,17 @@ for params in list_params:
                          .map(remove_cloud)
                          .filter(ee.Filter.calendarRange(m, m, 'month'))
                          .map(get_fractions)
-                         .map(get_ndfi))
+                         .map(get_ndfi)
+                         .select(['ndfi']))
             
             # Lógica condicional
             condition = ee.Algorithms.If(
                 time_coll.size().eq(0),
                 ee.List([]),
                 ee.Algorithms.If(
-                    target_coll.select('ndfi').filter(ee.Filter.calendarRange(m, m, 'month')).size().eq(0),
+                    target_coll.filter(ee.Filter.calendarRange(m, m, 'month')).size().eq(0),
                     ee.List([]),
-                    ee.List(  # Adicionar conversão explícita para lista
-                        time_coll.select('ndfi')
-                        .reduce(ee.Reducer.median())
-                        .rename('metric')
-                        .map(lambda median:  
-                            target_coll.select('ndfi')
-                            .filter(ee.Filter.calendarRange(m, m, 'month'))
-                            .map(lambda img: 
-                                img.subtract(median)
-                                .updateMask(median.gt(0.8))
-                                .updateMask(lulc.eq(3))
-                                .rename('deviation')
-                            )
-                        ).flatten()  # Achatar a lista de listas
-                    )
+                    calculate_deviations(time_coll, target_coll, m, lulc)
                 )
             )
             deviations.append(condition)
@@ -206,7 +216,7 @@ for params in list_params:
         # Estatísticas finais
         sum_dam = col_dam.sum()
         valid_obs = col_deviation.map(lambda img: img.unmask(100).neq(100)).sum()
-        final_result = sum_dam.divide(valid_obs).rename('dam_freq')
+        final_result = sum_dam.divide(valid_obs).multiply(100).byte().rename('dam_freq')
         
         # Exportar
         export_name = f'DAM_{year}_{grid}_{version}'
