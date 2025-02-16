@@ -6,7 +6,7 @@ asset_lulc = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas
 asset_tiles = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 asset_roi = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
 asset_output = 'projects/ee-mapbiomas-imazon/assets/degradation/dam-frequency-c2'
-version = '2'
+version = '4'
 
 default_params = {
     'tresh_dam_min': -0.250,
@@ -128,106 +128,99 @@ def remove_cloud_shadow(image):
     cond = cond.where(proximity.gt(0), 0)
     return image.updateMask(cond)
 
-def create_time_band(image):
-    return image.addBands(image.metadata('system:time_start').divide(1e18))
-
-def calculate_deviations(collection_time_win, collection_target, month_int, lulc):
-    # Calcula a mediana mensal da coleção no tempo de referência
-    median_monthly = collection_time_win.select('ndfi').reduce(ee.Reducer.median()).rename('metric')
-    
-    # Filtra a coleção alvo pelo mês específico
-    collection_monthly = collection_target.select('ndfi').filter(ee.Filter.calendarRange(month_int, month_int, 'month'))
-    
-    # Função para calcular a diferença entre a imagem e a mediana mensal
-    def compute_deviation(img):
-        deviation = img.subtract(median_monthly) \
-            .updateMask(median_monthly.gt(0.80)) \
-            .updateMask(lulc.eq(3)) \
-            .rename('deviation')
-        return deviation.copyProperties(img)
-    
-    # Aplica a função a cada imagem da coleção
-    collection_deviations = collection_monthly.map(compute_deviation)
-    
-    return collection_deviations.toList(collection_deviations.size())
 
 # Processamento principal
 regions = ee.FeatureCollection(asset_roi).filter(ee.Filter.eq('Bioma', 'Amazônia'))
 tiles = ee.ImageCollection(asset_tiles).filterBounds(regions.geometry())
-tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
-tiles_list = set(tiles_list)
-#tiles_list = [226068]
+#tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+#tiles_list = set(tiles_list)
+tiles_list = [226068]
 
 for params in list_params:
     year, param_dict = params[0], params[1]
     lulc = ee.Image(asset_lulc).select(f'classification_2023')
     
+    start = f"{year}-01-01"
+    end = f"{year}-12-30"
+
     for grid in tiles_list:
-        tile_img = ee.Image(tiles.filter(ee.Filter.eq('tile', grid)).first())
-        roi = tile_img.geometry()
+        
+        tile_image = ee.Image(tiles.filter(f'tile == {grid}').first())
+        roi = tile_image.geometry()
         center = roi.centroid()
         
-        # Processar coleção alvo
-        target_coll = (get_collection(f'{year}-01-01', f'{year}-12-30', 100, center)
-                      .map(remove_cloud)
-                      .map(get_fractions)
-                      .map(get_ndfi)
-                      .select(['ndfi']))
+        dict_params = params[1]
         
-        # Janela temporal
-        start_tm = f"{year - param_dict['time_window'] + 1}-01-01"
-        end_tm = f"{year - 1}-12-31"
+        collection_target = (get_collection(start, end, 100, center)
+            .map(remove_cloud)
+            .map(get_fractions)
+            .map(get_ndfi)
+            .select(['ndfi']))
         
-        # Processar desvios mensais
+        start_tm = f"{year - dict_params['time_window'] + 1}-01-01"
+        end_tm = f"{year - 1}-01-01"
+
+        print(start_tm, end_tm)
+
+        # deviations = ee.List(months).map(lambda m: compute_deviations(m, collection_target, start_tm, end_tm, roi))
         deviations = []
-        for month in months:
-            m = int(month)
-            # Coleção de referência
-            time_coll = (get_collection(start_tm, end_tm, 100, roi)
-                         .map(remove_cloud)
-                         .filter(ee.Filter.calendarRange(m, m, 'month'))
-                         .map(get_fractions)
-                         .map(get_ndfi)
-                         .select(['ndfi']))
+        for m in months:
+            month_int = ee.Number.parse(ee.String(m))
+
+            collection_time_win = (get_collection(start_tm, end_tm, 100, roi)
+                .map(remove_cloud)
+                .filter(ee.Filter.calendarRange(month_int, month_int, 'month'))
+                .map(get_fractions)
+                .map(get_ndfi)
+                .select(['ndfi']))
             
-            # Lógica condicional
-            condition = ee.Algorithms.If(
-                time_coll.size().eq(0),
+            median_monthly = collection_time_win.reduce(ee.Reducer.median()).rename('metric')
+
+            collection_taget_monthly = collection_target.select(['ndfi']).filter(ee.Filter.calendarRange(month_int, month_int, 'month'))
+            
+            list_deviations = ee.Algorithms.If(
+                collection_time_win.size().eq(0),
                 ee.List([]),
                 ee.Algorithms.If(
-                    target_coll.filter(ee.Filter.calendarRange(m, m, 'month')).size().eq(0),
+                    collection_taget_monthly.size().eq(0),
                     ee.List([]),
-                    calculate_deviations(time_coll, target_coll, m, lulc)
+                    collection_taget_monthly.map(lambda img: img.subtract(median_monthly)
+                        .mask(median_monthly.gt(0.80))
+                        .mask(lulc.eq(3))
+                        .rename('deviation')).toList(collection_taget_monthly.size())
                 )
             )
-            deviations.append(condition)
+
+            deviations.append(list_deviations)
+
         
-        # Consolidar resultados
         col_deviation = ee.ImageCollection(ee.List(deviations).flatten())
         
-        # Calcular danos
-        col_dam = col_deviation.map(lambda img: 
-            img.expression('b("deviation") >= min && b("deviation") <= max', {
-                'deviation': img.select('deviation'),
-                'min': param_dict['tresh_dam_min'],
-                'max': param_dict['tresh_dam_max']
-            }).rename('dam'))
-        
-        # Estatísticas finais
+        col_dam = col_deviation.map(lambda image: image.expression('deviation >= min && deviation <= max', {
+                'deviation': image.select('deviation'),
+                'min': dict_params['tresh_dam_min'],
+                'max': dict_params['tresh_dam_max']
+            }
+        ))
+            
         sum_dam = col_dam.sum()
-        valid_obs = col_deviation.map(lambda img: img.unmask(100).neq(100)).sum()
-        final_result = sum_dam.divide(valid_obs).multiply(100).byte().rename('dam_freq')
         
-        # Exportar
-        export_name = f'DAM_{year}_{grid}_{version}'
+        valid_observations = col_deviation.map(lambda img: img.unmask(100).neq(100)).sum()
+        col_dam_norm = sum_dam.divide(valid_observations).multiply(100).byte()
+        
+        name = f"DAM_{year}_{grid}_{version}"
+        asset_id = f"{asset_output}/{name}"
+        
+        print(f'Exporting {name}')
+        
         task = ee.batch.Export.image.toAsset(
-            image=final_result,
-            description=export_name,
-            assetId=f'{asset_output}/{export_name}',
+            image=ee.Image(col_dam_norm).selfMask(),
+            description=name,
+            assetId=asset_id,
+            pyramidingPolicy={'.default': 'mode'},
             region=roi,
             scale=30,
-            maxPixels=1e13,
-            pyramidingPolicy={'.default': 'mode'}
+            maxPixels=1e13
         )
+        
         task.start()
-        print(f'Exportando: {export_name}')

@@ -19,9 +19,9 @@ defaultParams = {
 }
 
 listParams = [
-    [2024, defaultParams],
-    # [2023, defaultParams],
-    # [2021, defaultParams],
+    # [2024, defaultParams],
+    # [2023, defaultParams], 
+    # [2022, defaultParams],
     # [2020, defaultParams],
     # [2019, defaultParams],
     # [2018, defaultParams],
@@ -31,18 +31,18 @@ listParams = [
     # [2014, defaultParams],
     # [2013, defaultParams],
     # [2012, defaultParams],
-    # [2011, defaultParams],
-    # [2010, defaultParams],
-    # [2009, defaultParams],
-    # [2008, defaultParams],
-    # [2007, defaultParams],
-    # [2006, defaultParams],
-    # [2005, defaultParams],
-    # [2004, defaultParams],
-    # [2003, defaultParams],
-    # [2002, defaultParams],
-    # [2001, defaultParams],
-    # [2000, defaultParams],
+    [2011, defaultParams],
+    [2010, defaultParams],
+    [2009, defaultParams],
+    [2008, defaultParams],
+    [2007, defaultParams],
+    [2006, defaultParams],
+    [2005, defaultParams],
+    [2004, defaultParams],
+    [2003, defaultParams],
+    [2002, defaultParams],
+    [2001, defaultParams],
+    [2000, defaultParams],
     # [1999, defaultParams],
     # [1998, defaultParams],
     # [1997, defaultParams],
@@ -58,7 +58,8 @@ listParams = [
     # [1987, defaultParams],
 ]
 
-months = ['01','02','03','04','05', '06', '07','08', '09','10', '11']
+
+
 
 # Função para obter a coleção
 def getCollection(dateStart, dateEnd, cloudCover, roi):
@@ -179,14 +180,15 @@ regions = ee.FeatureCollection(assetRoi).filter(ee.Filter.eq('Bioma', 'Amazônia
 
 # Carregar a coleção de tiles
 tiles = ee.ImageCollection(assetTiles).filterBounds(regions.geometry())
-# tilesList = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+tilesList = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+tilesList = set(tilesList)
 
-tilesList = [226068]
+# tilesList = [226068]
 
 # Loop pelos anos e parâmetros
 for params in listParams:
     year = params[0]
-    lulc = ee.Image(assetLulc).select('classification_2023')
+    lulc = ee.Image(assetLulc).select(f'classification_{year}')
 
     start = f"{year}-01-01"
     end = f"{year}-12-30"
