@@ -73,7 +73,7 @@ def track_patches(base_raster, yearly_rasters):
 '''
 
     Input
-
+  
 '''
 
 raster_files = sorted([f for f in os.listdir(raster_dir) if f.endswith(".tif")])
