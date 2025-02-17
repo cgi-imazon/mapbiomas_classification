@@ -381,14 +381,6 @@ listParams.forEach(function(params){
           });
         });
         
-        //var linearFit = colDeviation.select(['system:time_start', 'ndfi'])
-        //    .map(function(img){return img.double()})
-        //    .reduce(ee.Reducer.linearFit()).select('scale');
-            
-        //print(linearFit)
-        
-        //var sumDeviation = colDeviation.sum();
-        
         var sumDam = colDam.sum();
       
         //
@@ -396,7 +388,7 @@ listParams.forEach(function(params){
             return img.unmask(100).neq(100); // Conta somente valores válidos (não nulos)
         }).sum();
                 
-        var colDamNorm = sumDam.divide(validObservations)//.multiply(100).byte();        
+        var colDamNorm = sumDam.divide(validObservations).multiply(100).byte();        
         
         // export session
         var name =  'DAM_' + year.toString() + '_' +  grid.toString() + '_' + version
@@ -405,8 +397,8 @@ listParams.forEach(function(params){
         print('exporting ', name)
         
         Export.image.toAsset({
-          //image: colDamNorm, 
-          image: sumDam, 
+          image: colDamNorm, 
+          //image: sumDam, 
           description: name, 
           assetId:assetId, 
           pyramidingPolicy: {'.default': 'mode'}, 

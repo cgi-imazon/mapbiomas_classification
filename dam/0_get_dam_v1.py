@@ -1,179 +1,247 @@
 import ee
+
+# Initialize the Earth Engine API
 ee.Initialize()
 
 # Configurações
-asset_lulc = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas_collection90_integration_v1'
-asset_tiles = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
-asset_roi = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
-asset_output = 'projects/ee-mapbiomas-imazon/assets/degradation/dam-frequency-c2'
+assetLulc = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas_collection90_integration_v1'
+assetTiles = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
+assetRoi = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
+assetOutput = 'projects/ee-mapbiomas-imazon/assets/degradation/dam-frequency-c2'
 version = '1'
 
-default_params = {
+defaultParams = {
+    # 'mask_tresh': 120, # 150
     'tresh_dam_min': -0.250,
     'tresh_dam_max': -0.095,
-    'time_window': 2
+    # 'cloud_tresh': 2, # threshold to mask clouds. It is very sensitive to results,
+    'time_window': 3
 }
 
-list_params = [
-    [2023, default_params]
+listParams = [
+    # [2024, defaultParams],
+    # [2023, defaultParams], 
+    # [2022, defaultParams],
+    # [2020, defaultParams],
+    # [2019, defaultParams],
+    # [2018, defaultParams],
+    # [2017, defaultParams],
+    # [2016, defaultParams],
+    # [2015, defaultParams],
+    # [2014, defaultParams],
+    # [2013, defaultParams],
+    # [2012, defaultParams],
+    # [2011, defaultParams],
+    # [2010, defaultParams],
+    # [2009, defaultParams],
+    [2008, defaultParams],
+    [2007, defaultParams],
+    # [2006, defaultParams],
+    # [2005, defaultParams],
+    # [2004, defaultParams],
+    # [2003, defaultParams],
+    # [2002, defaultParams],
+    # [2001, defaultParams],
+    # [2000, defaultParams],
+    # [1999, defaultParams],
+    # [1998, defaultParams],
+    # [1997, defaultParams],
+    # [1996, defaultParams],
+    # [1995, defaultParams],
+    # [1994, defaultParams],
+    # [1993, defaultParams],
+    # [1992, defaultParams],
+    # [1991, defaultParams],
+    # [1990, defaultParams],
+    # [1989, defaultParams],
+    # [1988, defaultParams],
+    # [1987, defaultParams],
 ]
 
-months = ['01','02','03','04','05','06','07','08','09','10','11']
 
-# Funções auxiliares
-def get_collection(date_start, date_end, cloud_cover, roi):
+
+
+# Função para obter a coleção
+def getCollection(dateStart, dateEnd, cloudCover, roi):
     bands = ['blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'pixel_qa', 'tir']
     
     l5 = (ee.ImageCollection('LANDSAT/LT05/C02/T1_L2')
-          .filter(f'CLOUD_COVER <= {cloud_cover}')
+          .filter(ee.Filter.lte('CLOUD_COVER', cloudCover))
           .filterBounds(roi)
-          .filterDate(date_start, date_end)
+          .filterDate(dateStart, dateEnd)
           .map(lambda img: img.set('time', img.get('system:time_start'))))
-    
-    l5 = scale_factor_bands(l5).select(
-        ['SR_B1','SR_B2','SR_B3','SR_B4','SR_B5','SR_B7','QA_PIXEL','ST_B6'], 
-        bands
-    )
+    l5 = scaleFactorBands(l5).select(['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'QA_PIXEL', 'ST_B6'], bands)
     
     l7 = (ee.ImageCollection('LANDSAT/LE07/C02/T1_L2')
-          .filter(f'CLOUD_COVER <= {cloud_cover}')
+          .filter(ee.Filter.lte('CLOUD_COVER', cloudCover))
           .filterBounds(roi)
-          .filterDate(date_start, date_end)
+          .filterDate(dateStart, dateEnd)
           .map(lambda img: img.set('time', img.get('system:time_start'))))
-    
-    l7 = scale_factor_bands(l7).select(
-        ['SR_B1','SR_B2','SR_B3','SR_B4','SR_B5','SR_B7','QA_PIXEL','ST_B6'], 
-        bands
-    )
+    l7 = scaleFactorBands(l7).select(['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7', 'QA_PIXEL', 'ST_B6'], bands)
     
     l8 = (ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')
-          .filter(f'CLOUD_COVER <= {cloud_cover}')
+          .filter(ee.Filter.lte('CLOUD_COVER', cloudCover))
           .filterBounds(roi)
-          .filterDate(date_start, date_end)
+          .filterDate(dateStart, dateEnd)
           .map(lambda img: img.set('time', img.get('system:time_start'))))
-    
-    l8 = scale_factor_bands(l8).select(
-        ['SR_B2','SR_B3','SR_B4','SR_B5','SR_B6','SR_B7','QA_PIXEL','ST_B10'], 
-        bands
-    )
+    l8 = scaleFactorBands(l8).select(['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'QA_PIXEL', 'ST_B10'], bands)
     
     l9 = (ee.ImageCollection('LANDSAT/LC09/C02/T1_L2')
-          .filter(f'CLOUD_COVER <= {cloud_cover}')
+          .filter(ee.Filter.lte('CLOUD_COVER', cloudCover))
           .filterBounds(roi)
-          .filterDate(date_start, date_end)
+          .filterDate(dateStart, dateEnd)
           .map(lambda img: img.set('time', img.get('system:time_start'))))
+    l9 = scaleFactorBands(l9).select(['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'QA_PIXEL', 'ST_B10'], bands)
     
-    l9 = scale_factor_bands(l9).select(
-        ['SR_B2','SR_B3','SR_B4','SR_B5','SR_B6','SR_B7','QA_PIXEL','ST_B10'], 
-        bands
-    )
+    collection = l5.merge(l7).merge(l8).merge(l9)
+    return collection
+
+# Função para aplicar o fator de escala
+def scaleFactorBands(collection):
+    def scale(image):
+        tmStart = image.get('system:time_start')
+        tmEnd = image.get('system:time_end')
+
+        optical_bands = image.select('SR_B.*').multiply(0.0000275).add(-0.2)
+        thermal_bands = image.select('ST_B.*').multiply(0.00341802).add(149.0)
+
+        return image.addBands(optical_bands, None, True).addBands(thermal_bands, None, True).selfMask()\
+                    .copyProperties(image)\
+                    .set('system:time_start', tmStart)\
+                    .set('system:time_end', tmEnd)
     
-    return l5.merge(l7).merge(l8).merge(l9)
+    return collection.map(scale)
 
-def scale_factor_bands(collection):
-    def apply_scaling(img):
-        optical = img.select('SR_B.').multiply(0.0000275).add(-0.2)
-        thermal = img.select('ST_B.*').multiply(0.00341802).add(149.0)
-        return img.addBands(optical, None, True)\
-                  .addBands(thermal, None, True)\
-                  .selfMask()\
-                  .copyProperties(img)\
-                  .set('system:time_start', img.get('system:time_start'))\
-                  .set('system:time_end', img.get('system:time_end'))
-    return collection.map(apply_scaling)
-
-def get_fractions(image):
+# Função para obter as frações
+def getFractions(image):
     ENDMEMBERS = [
-        [0.0119,0.0475,0.0169,0.625,0.2399,0.0675],
-        [0.1514,0.1597,0.1421,0.3053,0.7707,0.1975],
-        [0.1799,0.2479,0.3158,0.5437,0.7707,0.6646],
-        [0.4031,0.8714,0.79,0.8989,0.7002,0.6607]
+        [0.0119, 0.0475, 0.0169, 0.625, 0.2399, 0.0675],  # GV
+        [0.1514, 0.1597, 0.1421, 0.3053, 0.7707, 0.1975],  # NPV
+        [0.1799, 0.2479, 0.3158, 0.5437, 0.7707, 0.6646],  # Soil
+        [0.4031, 0.8714, 0.79, 0.8989, 0.7002, 0.6607]  # Cloud
     ]
     
-    fractions = image.select(['blue','green','red','nir','swir1','swir2'])\
-                    .unmix(ENDMEMBERS)\
-                    .max(0)\
-                    .rename(['gv','npv','soil','cloud'])
-    
+    fractions = ee.Image(image).select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2']).unmix(ENDMEMBERS).max(0)
+    fractions = fractions.rename(['gv', 'npv', 'soil', 'cloud'])
+
     summed = fractions.expression('b("gv") + b("npv") + b("soil")')
-    shade = summed.subtract(1.0).abs().rename('shade')
-    return image.addBands(fractions).addBands(shade)
+    shade = summed.subtract(1.0).abs().rename("shade")
 
-def get_ndfi(image):
+    fractions = fractions.addBands(shade)
+    return image.addBands(fractions)
+
+# Função para calcular o NDFI
+def getNdfi(image):
     summed = image.expression('b("gv") + b("npv") + b("soil")')
-    gvs = image.select('gv').divide(summed).rename('gvs')
-    npv_soil = summed.subtract(gvs)
-    ndfi = ee.Image.cat(gvs, npv_soil).normalizedDifference().rename('ndfi').clamp(-1, 1)
-    return image.addBands(gvs).addBands(ndfi)
+    gvs = image.select("gv").divide(summed).rename("gvs")
 
-def remove_cloud(image):
+    npvSoil = image.expression('b("npv") + b("soil")')
+    ndfi = ee.Image.cat(gvs, npvSoil).normalizedDifference().rename('ndfi')
+
+    image = image.addBands(gvs)
+    image = image.addBands(ndfi.clamp(-1, 1))
+
+    return ee.Image(image)
+
+# Função para remover nuvens
+def removeCloud(image):
+    cloudShadowBitMask = 1 << 3
+    cloudsBitMask = 1 << 4
+
     qa = image.select('pixel_qa')
-    mask = qa.bitwiseAnd(1 << 3).eq(0).And(qa.bitwiseAnd(1 << 4).eq(0))
+    mask = qa.bitwiseAnd(cloudShadowBitMask).eq(0).And(qa.bitwiseAnd(cloudsBitMask).eq(0))
+
     return image.updateMask(mask).copyProperties(image)
 
-# Processamento principal
-regions = ee.FeatureCollection(asset_roi).filter(ee.Filter.eq('Bioma', 'Amazônia'))
-tiles = ee.ImageCollection(asset_tiles).filterBounds(regions.geometry())
-tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+# Função para remover sombra de nuvens
+def removeCloudShadow(image):
+    qa = image.select('qa_pixel')
+    cloudThreshold = image.select('cloud').lt(0.025)
 
-for params in list_params:
-    year, param_dict = params[0], params[1]
-    lulc = ee.Image(asset_lulc).select(f'classification_{year}')
-    
-    for grid in tiles_list:
-        tile_img = ee.ImageCollection(asset_tiles).filter(ee.Filter.eq('tile', grid)).first()
-        roi = tile_img.geometry()
+    cond = cloudThreshold
+    kernel = ee.Kernel.euclidean(60, 'meters')
+    proximity = cond.distance(kernel, False)
+
+    cond = cond.where(proximity.gt(0), 0)
+    image = image.updateMask(cond)
+
+    proximity = image.select('ndfi').unmask(-1).eq(-1).distance(kernel, False)
+    cond = cond.where(proximity.gt(0), 0)
+    image = image.updateMask(cond)
+
+    return image
+
+# Função para criar banda temporal
+def createTimeBand(image):
+    return image.addBands(image.metadata('system:time_start').divide(1e18))
+
+# Carregar a coleção de regiões
+regions = ee.FeatureCollection(assetRoi).filter(ee.Filter.eq('Bioma', 'Amazônia'))
+
+# Carregar a coleção de tiles
+tiles = ee.ImageCollection(assetTiles).filterBounds(regions.geometry())
+tilesList = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+tilesList = set(tilesList)
+
+# tilesList = [226068]
+
+# Loop pelos anos e parâmetros
+for params in listParams:
+    year = params[0]
+    lulc = ee.Image(assetLulc).select(f'classification_{year}')
+
+    start = f"{year}-01-01"
+    end = f"{year}-12-30"
+
+    for grid in tilesList:
+        tileImage = ee.Image(tiles.filter(ee.Filter.eq('tile', grid)).first())
+        roi = tileImage.geometry()
         center = roi.centroid()
-        
-        # Processar coleção alvo
-        target_coll = (get_collection(f'{year}-01-01', f'{year}-12-30', 100, center)
-                      .map(remove_cloud)
-                      .map(get_fractions)
-                      .map(get_ndfi))
-        
-        # Processar janela temporal
-        start_tm = f"{year - param_dict['time_window'] + 1}-01-01"
-        end_tm = f"{year - 1}-01-01"
-        
-        # Coleção de referência
-        time_coll = (get_collection(start_tm, end_tm, 100, roi)
-                     .map(remove_cloud)
-                     .map(get_fractions)
-                     .map(get_ndfi))
-        
-        # Calcular mediana
-        median_monthly = time_coll.select('ndfi').reduce(ee.Reducer.median()).rename('metric')
-        
-        # Calcular desvios
-        collection_deviations = target_coll.map(lambda img: 
-            img.select('ndfi')
-            .subtract(median_monthly)
-            .updateMask(median_monthly.gt(0.8))
-            .updateMask(lulc.eq(3))
-            .rename('deviation')
-            .copyProperties(img))
-        
-        # Calcular danos
-        col_dam = collection_deviations.map(lambda img: 
-            img.expression('b("deviation") >= min && b("deviation") <= max', {
-                'deviation': img.select('deviation'),
-                'min': param_dict['tresh_dam_min'],
-                'max': param_dict['tresh_dam_max']
-            }))
-        
-        # Soma total de danos
-        sum_dam = col_dam.sum()
-        
-        # Exportar
-        export_name = f'DAM_{year}_{grid}_{version}'
+
+        dictParams = params[1]
+
+        collectionTarget = getCollection(start, end, 100, center)\
+            .map(removeCloud)\
+            .map(getFractions)\
+            .map(getNdfi)\
+            .select(['ndfi'])
+
+        startTm = f"{year - dictParams['time_window'] + 1}-01-01"
+        endTm = f"{year - 1}-01-01"
+
+        collectionTimeWin = getCollection(startTm, endTm, 100, roi)\
+            .map(removeCloud)\
+            .map(getFractions)\
+            .map(getNdfi)
+
+        medianMonthly = collectionTimeWin.select('ndfi').reduce(ee.Reducer.median()).rename('metric')
+
+        collectionDeviations = collectionTarget.map(lambda img: img.subtract(medianMonthly)
+                                                     .updateMask(medianMonthly.gt(0.80))
+                                                     .updateMask(lulc.eq(3))
+                                                     .rename('deviation'))
+
+        colDam = collectionDeviations.map(lambda image: image.expression('deviation >= min && deviation <= max', {
+            'deviation': image.select('deviation'),
+            'min': dictParams['tresh_dam_min'],
+            'max': dictParams['tresh_dam_max']
+        }))
+
+        sumDam = colDam.sum()
+
+        name = f'DAM_{year}_{grid}_{version}'
+        assetId = f'{assetOutput}/{name}'
+
+        print(f'Exporting {name}')
+
+        # Exportar a imagem para o Earth Engine
         task = ee.batch.Export.image.toAsset(
-            image=sum_dam,
-            description=export_name,
-            assetId=f'{asset_output}/{export_name}',
+            image=sumDam,
+            description=name,
+            assetId=assetId,
+            pyramidingPolicy={'.default': 'mode'},
             region=roi,
             scale=30,
-            maxPixels=1e13,
-            pyramidingPolicy={'.default': 'mode'}
+            maxPixels=1e13
         )
         task.start()
-        print(f'Exportando: {export_name}')
