@@ -45,7 +45,8 @@ PATH_AREAS = f'{PATH_DIR}/data/area/areas_la_1985_2022.csv'
 
 ASSET_CLASSIFICATION = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification'
 
-ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/mapbiomas/lulc_landsat/integrated'
+#ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/mapbiomas/lulc_landsat/integrated'
+ASSET_OUTPUT = 'projects/sad-deep-learning-274812/assets/mapbiomas/lulc_landsat/integrated'
 
 ASSETS_CLS_VERSIONS = {
     'classification_p1': {
@@ -106,8 +107,8 @@ YEARS = [
     # 2003, 2004, 
     # 2005, 2006, 2007, 2008,
     # 2009, 2010, 2011, 2012, 2013, 2014,
-    2015, 
-    #2016, 2017, 2018, 
+    # 2015, 2016,
+    # 2017, 2018, 
     # 2019, 2020,
     # 2021, 
     # 2022, 

@@ -1,13 +1,13 @@
 import ee
 
 # Initialize the Earth Engine API
-ee.Initialize()
+ee.Initialize(project='mapbiomas')
 
 # Configurações
 assetLulc = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas_collection90_integration_v1'
 assetTiles = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 assetRoi = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
-assetOutput = 'projects/ee-mapbiomas-imazon/assets/degradation/dam-frequency-c2'
+assetOutput = 'projects/sad-deep-learning-274812/assets/degradation/dam/dam-frequency-c2'
 version = '1'
 
 defaultParams = {
@@ -22,6 +22,7 @@ listParams = [
     # [2024, defaultParams],
     # [2023, defaultParams], 
     # [2022, defaultParams],
+    [2021, defaultParams],
     # [2020, defaultParams],
     # [2019, defaultParams],
     # [2018, defaultParams],
@@ -34,8 +35,8 @@ listParams = [
     # [2011, defaultParams],
     # [2010, defaultParams],
     # [2009, defaultParams],
-    [2008, defaultParams],
-    [2007, defaultParams],
+    # [2008, defaultParams],
+    # [2007, defaultParams],
     # [2006, defaultParams],
     # [2005, defaultParams],
     # [2004, defaultParams],
