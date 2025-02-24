@@ -1,19 +1,23 @@
-import ee
+import ee 
 
 # Initialize the Earth Engine API
 ee.Initialize(project='mapbiomas')
 
 # Configurações
-assetLulc = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas_collection90_integration_v1'
+# assetLulc = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas_collection90_integration_v1'
+assetLulc = 'projects/mapbiomas-raisg/public/collection5/mapbiomas_raisg_panamazonia_collection5_integration_v1'
 assetTiles = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
-assetRoi = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
-assetOutput = 'projects/sad-deep-learning-274812/assets/degradation/dam/dam-frequency-c2'
+# assetRoi = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
+assetRoi = 'projects/mapbiomas-raisg/DATOS_AUXILIARES/VECTORES/biomas-paises'
+#assetOutput = 'projects/sad-deep-learning-274812/assets/degradation/dam/dam-df-c2'
+assetOutput = 'projects/ee-mapbiomas-imazon/assets/degradation/dam-frequency-c2'
 version = '1'
 
 defaultParams = {
     # 'mask_tresh': 120, # 150
     'tresh_dam_min': -0.250,
     'tresh_dam_max': -0.095,
+    'tresh_df_min': -0.250,
     # 'cloud_tresh': 2, # threshold to mask clouds. It is very sensitive to results,
     'time_window': 3
 }
@@ -177,19 +181,24 @@ def createTimeBand(image):
     return image.addBands(image.metadata('system:time_start').divide(1e18))
 
 # Carregar a coleção de regiões
-regions = ee.FeatureCollection(assetRoi).filter(ee.Filter.eq('Bioma', 'Amazônia'))
+regions = ee.FeatureCollection(assetRoi)\
+    .filter(ee.Filter.eq('name', 'Amazonía'))
 
 # Carregar a coleção de tiles
 tiles = ee.ImageCollection(assetTiles).filterBounds(regions.geometry())
 tilesList = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 tilesList = set(tilesList)
 
-# tilesList = [226068]
+#tilesList = [226068]
 
 # Loop pelos anos e parâmetros
 for params in listParams:
     year = params[0]
-    lulc = ee.Image(assetLulc).select(f'classification_{year}')
+
+    bandName = f'classification_{year}' if year <= 2022 else 'classification_2022'
+
+
+    lulc = ee.Image(assetLulc).select(bandName)
 
     start = f"{year}-01-01"
     end = f"{year}-12-30"
@@ -219,6 +228,7 @@ for params in listParams:
 
         collectionDeviations = collectionTarget.map(lambda img: img.subtract(medianMonthly)
             .updateMask(medianMonthly.gt(0.80))
+            #.updateMask(lulc.eq(3).Or(lulc.eq(6)))
             .updateMask(lulc.eq(3))
             .rename('deviation')
         )
@@ -229,16 +239,29 @@ for params in listParams:
             'max': dictParams['tresh_dam_max']
         }))
 
-        sumDam = colDam.sum()
+        colDamDf = collectionDeviations.map(lambda image: image.expression('deviation < min', {
+            'deviation': image.select('deviation'),
+            'min': dictParams['tresh_df_min']
+        }))
+
+        sumDam = ee.Image(colDam.sum()).rename('freq_dam').selfMask()
+        sumDamDf = ee.Image(colDamDf.sum()).rename('freq_dam_df').selfMask()
+
+
+        # image export
+        imageExport = sumDam.addBands(sumDamDf)
+        imageExport = imageExport\
+            .set('year', year)\
+            .set('version', version)
 
         name = f'DAM_{year}_{grid}_{version}'
         assetId = f'{assetOutput}/{name}'
 
         print(f'Exporting {name}')
 
-        # Exportar a imagem para o Earth Engine
+        #
         task = ee.batch.Export.image.toAsset(
-            image=sumDam,
+            image=imageExport,
             description=name,
             assetId=assetId,
             pyramidingPolicy={'.default': 'mode'},

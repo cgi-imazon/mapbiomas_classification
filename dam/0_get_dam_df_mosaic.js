@@ -3,11 +3,14 @@ var palettes = require('users/gena/packages:palettes');
 // config
 
 
-var assetLulc = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas_collection90_integration_v1';
+//var assetLulc = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas_collection90_integration_v1';
+var assetLulc = 'projects/mapbiomas-raisg/public/collection3/mapbiomas_raisg_panamazonia_collection3_integration_v2'
+
 
 var assetTiles = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask';
 
-var assetRoi = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019';
+// var assetRoi = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019';
+var assetRoi = 'projects/mapbiomas-raisg/DATOS_AUXILIARES/VECTORES/biomas-paises'
 
 var assetOutput = 'projects/ee-mapbiomas-imazon/assets/degradation/dam-frequency-c2'
 
@@ -15,20 +18,23 @@ var version = '1'
 
 
 
+
+
+
+
 var defaultParams = {
-    //'mask_tresh': 120, // 150
     'tresh_dam_min': -0.250,
     'tresh_dam_max': -0.095,
-    //'cloud_tresh': 2, // treshould to mask clouds. It is very sensitive to results,
-    'time_window': 2
+    'tresh_df_min': -0.250,
+    'time_window': 3
 }
 
 var listParams = [
-    //[2024, defaultParams],
+    [2024, defaultParams],
     [2023, defaultParams],
-    // [2021, defaultParams],
-    // [2020, defaultParams],
-    // [2019, defaultParams],
+    [2021, defaultParams],
+    [2020, defaultParams],
+    [2019, defaultParams],
     // [2018, defaultParams],
     // [2017, defaultParams],
     // [2016, defaultParams],
@@ -63,10 +69,28 @@ var listParams = [
     // [1987, defaultParams],
 ]
 
-var months = ['01','02','03','04','05', '06', '07','08', '09','10', '11']
+
+
+
+
+
+
+var regions = ee.FeatureCollection(assetRoi)
+    .filter('name == "Amazonía"')
+    
+var roi = geometry; 
+
+
+//var tiles = ee.ImageCollection(assetTiles).filterBounds(regions.geometry());
+
+// var tilesList = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
+
+
+
 
 
 // get collection
+/*
 function getCollection(dateStart, dateEnd, cloudCover, roi) {
   
     var collection = null;
@@ -161,6 +185,16 @@ function getCollection(dateStart, dateEnd, cloudCover, roi) {
     return collection;
 
 }
+*/
+
+function getCollection(dateStart, dateEnd, cloudCover, roi){
+    var col = ee.ImageCollection('LANDSAT/COMPOSITES/C02/T1_L2_32DAY')
+        .filterDate(dateStart, dateEnd)
+        .filterBounds(roi)
+        .map(function(img){return img.clip(geometry)})
+    
+    return col
+}
 
 
 function scaleFactorBands(collection) {
@@ -253,29 +287,6 @@ function removeCloud(image) {
 }
 
 
-function removeCloudShadow(image) {
-    var qa = image.select('qa_pixel');
-
-  
-    var cloudThreshold = image.select('cloud').lt(0.025);
-
-    var cond = cloudThreshold;
-    var kernel = ee.Kernel.euclidean(60, 'meters');
-    var proximity = cond.distance(kernel, false);
-
-    cond = cond.where(proximity.gt(0), 0);
-    image = image.updateMask(cond);
-
-    proximity = image.select('ndfi').unmask(-1).eq(-1).distance(kernel, false);
-
-    cond = cond.where(proximity.gt(0), 0);
-    image = image.updateMask(cond);
-
-    return image;
-}
-
-
-
 function createTimeBand(image) {
   return image.addBands(image.metadata('system:time_start').divide(1e18));
 }
@@ -286,156 +297,119 @@ function createTimeBand(image) {
 
 
 
-var regions = ee.FeatureCollection(assetRoi)
-    .filter('Bioma == "Amazônia"')
-    
-var tiles = ee.ImageCollection(assetTiles).filterBounds(regions.geometry());
-
-//var tilesList = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
-
-var tilesList = [
-    226068
-];
-
-
-
 listParams.forEach(function(params){
       
     var year = params[0];
+    var dictParams = params[1];
     
-    var lulc = ee.Image(assetLulc).select('classification_' + year.toString())
+    var band = 'classification_' + (year - 1).toString()
+    
+    if (year >= 2020) { band = 'classification_2019' }
+    
+    var lulc = ee.Image(assetLulc).select(band)
+
+
+
 
     var start = String(year) + '-01-01';
     var end = String(year) + '-12-30';
     
+      var startTm = String((year - (dictParams['time_window']) + 1))  + '-01-01';
+    var endTm = String(year - 1)  + '-01-01';
     
-    tilesList.forEach(function(grid){
-      
-        var tileImage = ee.Image(tiles.filter('tile == ' + grid).first())
-
-        var roi = tileImage.geometry()
-
-        var center = roi.centroid()
+    
+    
+    
+    var collectionTarget = getCollection(start, end, 100, roi)
+        //.map(removeCloud)
+        .map(getFractions)
+        .map(getNdfi)
+        .select(['ndfi']);
         
-        var dictParams = params[1];
+    var collectionTimeWin = getCollection(startTm, endTm, 100, roi)
+        //.map(removeCloud)
+        .map(getFractions)
+        .map(getNdfi)
+        .select(['ndfi']);
+        
+        
+        
         
     
-        var collectionTarget = getCollection(start, end, 100, center)
-            .map(removeCloud)
-            .map(getFractions)
-            .map(getNdfi)
-     
-            
-        var startTm = String((year - (dictParams['time_window']) + 1))  + '-01-01';
-        var endTm = String(year - 1)  + '-01-01';
-        
-        
-        
-        
-        
-        var deviations = months.map(function(m) {
-            var monthInt = parseInt(m);
-        
-            var collectionTimeWin = getCollection(startTm, endTm, 100, roi)
-                .map(removeCloud)
-                .filter(ee.Filter.calendarRange(monthInt, monthInt, 'month'))
-                .map(getFractions)
-                .map(getNdfi);
-      
-        
-            // Se a coleção estiver vazia, retorna uma lista vazia e interrompe a execução
-            return ee.Algorithms.If(
-                collectionTimeWin.size().eq(0),
-                ee.List([]),
-                ee.Algorithms.If(
-                    collectionTarget.select('ndfi').filter(ee.Filter.calendarRange(monthInt, monthInt, 'month')).size().eq(0),
-                    ee.List([]),
-                    (function() {
-                        var medianMonthly = collectionTimeWin.select('ndfi').reduce(ee.Reducer.median()).rename('metric');
-        
-                        var collectionMonthly = collectionTarget.select('ndfi')
-                            .filter(ee.Filter.calendarRange(monthInt, monthInt, 'month'));
-        
-        
-                        var collectionDeviations = collectionMonthly.map(function(img) {
-                            var deviation = img.subtract(medianMonthly)
-                                .updateMask(medianMonthly.gt(0.80))
-                                .updateMask(lulc.eq(3))
-                                .rename('deviation');
-                            return deviation.copyProperties(img);
-                        });
-        
-                        return collectionDeviations.toList(collectionDeviations.size());
-                    })()
-                )
-            );
-        });
-        
-        
-        var colDeviation = ee.ImageCollection(ee.List(deviations).flatten())//.filter(ee.Filter.gt('system:time_start', 1704067200000));
-        
-        
-        
-        var colDam = colDeviation.map(function(image){
-          return image.expression('deviation >= min && deviation <= max', {
-            'deviation': image.select('deviation'),
-            'min': dictParams['tresh_dam_min'],
-            'max': dictParams['tresh_dam_max']
-          });
-        });
+    var medianMonthly = collectionTimeWin.reduce(ee.Reducer.median()).rename('metric');
 
-        var colDamDf = collectionDeviations.map(function(image){
-          return image.expression('deviation <= min', {
-            'deviation': image.select('deviation'),
-            'min': dictParams['tresh_dam_min']
-          });
-        });
-        
-        var sumDam = colDam.sum('freq_dam');
-        var sumDamDf = colDamDf.sum().rename('freq_dam_df');
-        
+    var collectionDeviations = collectionTarget.map(function(img) {
+        var deviation = img.subtract(medianMonthly)
+            .updateMask(medianMonthly.gt(0.80))
+            .updateMask(lulc.eq(3))
+            .rename('deviation');
+        return deviation.copyProperties(img);
+    });
+    
+    
+    
+    
+    var colDam = collectionDeviations.map(function(image){
+      return image.expression('deviation >= min && deviation <= max', {
+        'deviation': image.select('deviation'),
+        'min': dictParams['tresh_dam_min'],
+        'max': dictParams['tresh_dam_max']
+      }).copyProperties(image)
+    });
 
-      
-        //
-        var validObservations = colDeviation.map(function(img) {
-            return img.unmask(100).neq(100); // Conta somente valores válidos (não nulos)
-        }).sum();
-                
-        var colDamNorm = sumDam.divide(validObservations).multiply(100).byte();        
-        
+    var colDamDf = collectionDeviations.map(function(image){
+      return image.expression('deviation <= min', {
+        'deviation': image.select('deviation'),
+        'min': dictParams['tresh_df_min']
+      }).copyProperties(image);
+    });
+    
+    
+    var sumDam = colDam.sum().rename('freq_dam').selfMask().byte();
+    var sumDamDf = colDamDf.sum().rename('freq_dam_df').selfMask().byte();
+    
+    var imageExport = sumDam.addBands(sumDamDf);
 
+    imageExport = imageExport
+        .set('year', year)
+        .set('version', version)
+    
+    
+    
+    
+    
+    
+    Map.addLayer(sumDam.updateMask(sumDam.gt(1)), {
+     // min:6, max:75,
+      min:1, max:10,
+      palette:palettes.cmocean.Thermal[7]
+    }, 'freq dam');
+    
 
-
-        var imageExport = sumDam.addBands(sumDamDf);
-
-        imageExport = imageExport
-            .set('year', year)
-            .set('version', version)
-
-
-        Map.addLayer(imageExport.select('freq_dam_df').selfMask(), {
-          min:1, max:35,
-          palette:palettes.cmocean.Thermal[7]
-        }, 'freq dam df');       
-
-
-        // export session
-        var name =  'DAM_' + year.toString() + '_' +  grid.toString() + '_' + version
-        var assetId = assetOutput + '/' + name;
-        
-        print('exporting ', name)
-        
-        Export.image.toAsset({
-          image: colDamNorm, 
-          //image: sumDam, 
-          description: name, 
-          assetId:assetId, 
-          pyramidingPolicy: {'.default': 'mode'}, 
-          region: roi, 
-          scale: 30, 
-          maxPixels:1e13
-        })
-    });  
+    Map.addLayer(sumDamDf.updateMask(sumDamDf.gt(1)), {
+      min:1, max:10,
+      palette:palettes.cmocean.Thermal[7]
+    }, 'freq dam df');        
+    
+    // export session
+    var name =  'DAM_' + year.toString() + '_' + version
+    var assetId = assetOutput + '/' + name;
+    
+    print('exporting ', name)
+    
+    Export.image.toAsset({
+      //image: colDamNorm, 
+      image: imageExport, 
+      description: name, 
+      assetId:assetId, 
+      pyramidingPolicy: {'.default': 'mode'}, 
+      region: roi, 
+      scale: 30, 
+      maxPixels:1e13
+    });
+    
+    
+    
 });
 
 
