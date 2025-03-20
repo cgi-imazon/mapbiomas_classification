@@ -314,7 +314,7 @@ listParams.forEach(function(params){
     var start = String(year) + '-01-01';
     var end = String(year) + '-12-30';
     
-      var startTm = String((year - (dictParams['time_window']) + 1))  + '-01-01';
+    var startTm = String((year - (dictParams['time_window']) + 1))  + '-01-01';
     var endTm = String(year - 1)  + '-01-01';
     
     

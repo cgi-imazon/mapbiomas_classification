@@ -313,13 +313,25 @@ def get_classification(geometry):
     collection1 = collection1\
         .filter(ee.Filter.inList("name", collectionFinal.aggregate_array('name')).Not())
 
-    collectionFinal = collectionFinal.merge(collection1)\
-        .merge(collection_amz_legal_p1)\
-        .merge(collection_amz_legal_p2)\
-        .merge(collection_amz_legal_p3)
+    collectionFinal = collectionFinal.merge(collection1)
     
     # data 2023
     collectionFinal = collectionFinal.merge(collection7)\
+    
+    collection_amz_legal_p1 = collection_amz_legal_p1\
+        .filter(ee.Filter.inList("name", collectionFinal.aggregate_array('name')).Not())
+    
+    collectionFinal = collectionFinal.merge(collection_amz_legal_p1)
+
+    collection_amz_legal_p2 = collection_amz_legal_p2\
+        .filter(ee.Filter.inList("name", collectionFinal.aggregate_array('name')).Not())
+    
+    collectionFinal = collectionFinal.merge(collection_amz_legal_p2)
+
+    collection_amz_legal_p3 = collection_amz_legal_p3\
+        .filter(ee.Filter.inList("name", collectionFinal.aggregate_array('name')).Not())
+    
+    collectionFinal = collectionFinal.merge(collection_amz_legal_p3)
 
 
     # Remap classes
