@@ -31,6 +31,7 @@ PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 
 ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 # ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
+ASSET_ROI = 'users/jailson/brazilian_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
