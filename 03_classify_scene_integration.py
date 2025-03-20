@@ -243,15 +243,24 @@ df_areas = pd.read_csv(PATH_AREAS).replace(SAMPLE_REPLACE_VAL)\
 def setName(image):
     return image.set('name', ee.String(image.get('system:index')).slice(0, 20))
 
+def setYear(image):
+    return image.set(
+        'year', 
+        ee.Number.parse((ee.String(image.get('date')).split('-').get(0))).int()
+    )
+
+
 def get_classification(geometry):
     collection1 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p1']['id'])\
         .filter(ee.Filter.eq("version", ASSETS_CLS_VERSIONS['classification_p1']['version']))\
         .filter(ee.Filter.bounds(geometry))\
-        .map(setName)
+        .map(setName)\
+        .map(setYear)
 
     collection2 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p2']['id'])\
         .filter(ee.Filter.bounds(geometry))\
-        .map(setName)
+        .map(setName)\
+        .map(setYear)
 
     collection3 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p3']['id'])\
         .filter(ee.Filter.eq("version", ASSETS_CLS_VERSIONS['classification_p3']['version']))\
