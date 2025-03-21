@@ -9,6 +9,7 @@ from retry import retry
 import concurrent.futures
 import datetime
 import threading
+import ee
 
 from utils.helpers import *
 from pprint import pprint
@@ -29,8 +30,9 @@ ee.Initialize(project=PROJECT)
 
 PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 
-ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+# ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 # ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
+ASSET_ROI = 'users/jailson/brazilian_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
@@ -38,9 +40,8 @@ ASSET_LULC = 'projects/mapbiomas-public/assets/brazil/lulc/collection9/mapbiomas
 
 
 # this must be your partition raw fc samples
-# ASSET_SAMPLES = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col4_points_w_edge_and_edited_v1'
-ASSET_SAMPLES =  'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_col3_points_w_edge_and_edited_v2_train_LA'
-
+ASSET_SAMPLES_P1 =  'projects/imazon-simex/LULC/COLLECTION9/SAMPLES/mapbiomas_85k_col3_points_w_edge_and_edited_v2_train_LA'
+ASSET_SAMPLES_P2 = 'projects/mapbiomas-workspace/VALIDACAO/mapbiomas_85k_col4_points_w_edge_and_edited_v1'
 
 LANDSAT_NEW_NAMES = [
     'blue',
@@ -89,12 +90,13 @@ YEARS = [
     # 1997, 1998, 1999, 2000, 
     # 2001, 2002, 2003, 2004, 
     # 2005, 2006, 2007, 2008,
-    2009, 2010, 2011, 2012, 
-    2013, 2014, 
+    # 2009, 2010, 2011, 2012, 
+    # 2013, 2014, 
     # 2015, 2016, 
     # 2017, 2018, 
     # 2019, 2020,
-    # 2021, 2022, 2023, 2024
+    # 2021, 2022, 2023, 
+    2024
 
 ]
 
@@ -213,15 +215,20 @@ tiles = ee.ImageCollection(ASSET_TILES).filterBounds(roi.geometry())
 
 tiles_list = tiles.reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 
-samples = ee.FeatureCollection(ASSET_SAMPLES)\
-    .filterBounds(roi)#\
-    #.filter('AMOSTRAS == "Treinamento"')\
+p1 = ee.FeatureCollection(ASSET_SAMPLES_P1)\
+    .filterBounds(roi)
     
+p2 = ee.FeatureCollection(ASSET_SAMPLES_P2)\
+    .filterBounds(roi)\
+    .filter('AMOSTRAS == "Treinamento"')
 
-print('samples ' + str(samples.size().getInfo()))
+
+samples = p1.merge(p1)
 
 
+print('ola')
 
+exit()
 
 
 
