@@ -95,7 +95,8 @@ YEARS = [
     # 2015, 2016, 
     # 2017, 2018, 
     # 2019, 2020,
-    2021, 2022, 2023, 
+    # 2021, 2022, 
+    2023
     
 
 ]
@@ -337,11 +338,11 @@ def get_dataset(image_id: str):
 
 
     # set properties
-    samples_image = samples_image.map(lambda feat: feat.copyProperties(image))
+    # samples_image = samples_image.map(lambda feat: feat.copyProperties(image))
     samples_image = samples_image.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))
     samples_image = samples_image.map(lambda feat: feat.set('tile', tile))
 
-    samples_segments = samples_segments.map(lambda feat: ee.Feature(feat).copyProperties(image))
+    # samples_segments = samples_segments.map(lambda feat: ee.Feature(feat).copyProperties(image))
     samples_segments = samples_segments.map(lambda feat: feat.set('year', year)).filter(ee.Filter.notNull(['.geo']))#.filter(ee.Filter.neq('label', 0))
     samples_segments = samples_segments.map(lambda feat: feat.set('tile', tile))
 
