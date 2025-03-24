@@ -33,20 +33,22 @@ ee.Initialize(project=PROJECT)
 
 PATH_DIR = '/home/jailson/Imazon/projects/mapbiomas/mapping_legal_amazon'
 
-ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
+# ASSET_ROI = 'projects/imazon-simex/LULC/LEGAL_AMAZON/biomes_legal_amazon'
 # ASSET_ROI = 'projects/mapbiomas-workspace/AUXILIAR/biomas-2019'
+ASSET_ROI = 'users/jailson/brazilian_legal_amazon'
 
 ASSET_TILES = 'projects/mapbiomas-workspace/AUXILIAR/landsat-mask'
 
 # PATH_SAMPLES = 'mapbiomas_classification\\data\\2024'
 PATH_SAMPLES = f'{PATH_DIR}/data'
 
-PATH_AREAS = f'{PATH_DIR}/data/area/areas_la_1985_2022.csv'
+PATH_AREAS = f'{PATH_DIR}/data/area/area_c9_amzlegal.csv'
 
 ASSET_CLASSIFICATION = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/classification'
 
 #ASSET_OUTPUT = 'projects/ee-mapbiomas-imazon/assets/mapbiomas/lulc_landsat/integrated'
-ASSET_OUTPUT = 'projects/sad-deep-learning-274812/assets/mapbiomas/lulc_landsat/integrated'
+#ASSET_OUTPUT = 'projects/sad-deep-learning-274812/assets/mapbiomas/lulc_landsat/integrated'
+ASSET_OUTPUT = 'projects/ee-cgi-imazon/assets/mapbiomas/lulc_landsat/integrated'
 
 ASSETS_CLS_VERSIONS = {
     'classification_p1': {
@@ -94,7 +96,7 @@ ASSETS_CLS_VERSIONS = {
 '''
     version 1: fetures from all sensors 
 '''
-OUTPUT_VERSION = '2'
+OUTPUT_VERSION = '1'
 
 
 YEARS = [
@@ -106,14 +108,14 @@ YEARS = [
     # 2000, 2001, 2002,
     # 2003, 2004, 
     # 2005, 2006, 2007, 2008,
-    2009, 2010, 2011, 2012, 2013, 2014,
+    # 2009, 2010, 2011, 2012, 2013, 2014,
     # 2015, 2016,
     # 2017, 2018, 
     # 2019, 2020,
     # 2021, 
     # 2022, 
     # 2023
-    # 2024
+    2024
 ]
 
 # EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -162,7 +164,7 @@ SAMPLE_REPLACE_VAL = {
 
 FEATURE_SPACE = [
     'distinct_total', 
-    'distinct_year', 
+    #'distinct_year', 
     
     'mode', 
     
@@ -198,17 +200,17 @@ MODEL_PARAMS = {
     # 'minLeafPopulation': 25
 }
 
-N_SAMPLES = 3500
+N_SAMPLES = 3000
 
 
 SAMPLE_PARAMS = pd.DataFrame([
     {'label':  3, 'min_samples': N_SAMPLES * 0.20},
-    {'label':  4, 'min_samples': N_SAMPLES * 0.20},
-    {'label': 12, 'min_samples': N_SAMPLES * 0.10},
+    {'label':  4, 'min_samples': N_SAMPLES * 0.15},
+    {'label': 12, 'min_samples': N_SAMPLES * 0.09},
     {'label': 15, 'min_samples': N_SAMPLES * 0.20},
-    {'label': 18, 'min_samples': N_SAMPLES * 0.10},
+    {'label': 18, 'min_samples': N_SAMPLES * 0.15},
     {'label': 25, 'min_samples': N_SAMPLES * 0.05},
-    {'label': 33, 'min_samples': N_SAMPLES * 0.15},
+    {'label': 33, 'min_samples': N_SAMPLES * 0.10},
 ])
 
 
@@ -229,7 +231,7 @@ SAMPLE_REPLACE_VAL = {
 
 roi_fc = ee.FeatureCollection(ASSET_ROI)#.filter('Bioma == "Amazônia"')
 
-tiles = ee.ImageCollection(ASSET_TILES)
+tiles = ee.ImageCollection(ASSET_TILES).filter(ee.Filter.eq('version', '2')).filterBounds(roi_fc.geometry())
 
 df_areas = pd.read_csv(PATH_AREAS).replace(SAMPLE_REPLACE_VAL)\
     .groupby(by=['tile','year','label'])['area'].sum().reset_index()
@@ -249,6 +251,11 @@ def setYear(image):
         ee.Number.parse((ee.String(image.get('date')).split('-').get(0))).int()
     )
 
+def add_tiles_around(image, tiles):
+    roi_moving = image.geometry().buffer(1, 1)
+    tiles_around = tiles.filter(ee.Filter.eq('version', '2')).filterBounds(roi_moving)
+    tiles_around_list = tiles_around.aggregate_array('tile')
+    return image.set('tiles_around', tiles_around_list)
 
 def get_classification(geometry):
     collection1 = ee.ImageCollection(ASSETS_CLS_VERSIONS['classification_p1']['id'])\
@@ -343,6 +350,7 @@ def get_classification(geometry):
     collectionFinal = collectionFinal.merge(collection_amz_legal_p3)
 
 
+
     # Remap classes
     collectionFinal = collectionFinal.map(
         lambda image: image.where(image.eq(19), 18)
@@ -353,69 +361,47 @@ def get_classification(geometry):
 
     return collectionFinal
 
-def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame, list_samples_df):
+def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame, samples_all, year_sample, tile):
 
-    res = []
+    year_sample = 2023 if year_sample > 2023 else year_sample
+    output_sp = []
 
-    # balance samples based on stratified area    
-    df_areas['area_p'] = df_areas['area'] / df_areas.groupby('tile')['area'].transform('sum')
-    df_areas['min_samples'] = df_areas['area_p'].mul(N_SAMPLES)
+    # get proportio from target tile
+    df_proportion = df_areas.query('year == @year_sample and tile == @tile')
+    df_proportion['area_p'] = df_proportion['area'].div(df_proportion['area'].sum())
+    df_proportion['n_samples'] = df_proportion['area_p'].mul(N_SAMPLES).round()
 
-    
-    # check min samples
-    for id, row in balance.iterrows():
+    for index, row in df_proportion.iterrows():
+        label, n_sp = row['label'], int(row['n_samples'])
 
-        label, min_samples_default = row['label'], row['min_samples']
-
-        df_areas_year = df_areas.query(f'label == {label}')
-
-        if df_areas_year.shape[0] > 0:
-            min_samples_area = int(df_areas_year['min_samples'].values[0])
-        else: 
-            min_samples_area = 0
-            
-
-        # check samples available
-        try:
-            sp_available = df_samples_amazon.query(f'label == {label}').shape[0]
-        except Exception as e:
-            print('no samples available')
-            sp_available = 0
-
-        if sp_available > min_samples_area and sp_available > 0:
-            samples_selected = df_samples_amazon.query(f'label == {label}').sample(n=min_samples_area)
+        if samples is not None and label != 0: 
+            n_sp_avail = samples.query('label == @label').shape[0]
         else:
-            n_sp = int(min_samples_area - sp_available)
-            samples_selected_plus = list_samples_df.query(f'label == {label}').sample(n=n_sp)
-            samples_selected = samples_selected_plus
- 
-        try:
-            res.append(samples_selected)
-        except Exception as e:
-            print(e)
-            continue
+            n_sp_avail = 0
 
-    # add samples to rare classes
-    min_samples_gras = list_samples_df.query('label == 12').sample(n=15)
-    min_samples_agr = list_samples_df.query('label == 18').sample(n=15)
-    min_samples_water = list_samples_df.query('label == 33').sample(n=15)
-    min_samles_savana = list_samples_df.query('label == 4').sample(n=15)
-    min_samles_savana = list_samples_df.query('label == 15').sample(n=15)
-    min_samles_forest = list_samples_df.query('label == 3').sample(n=15)
+        if n_sp_avail > n_sp:
+            print('n sp', n_sp, n_sp_avail)
+            output_sp.append(samples.query('label == @label').sample(n=n_sp))
 
-    # 
-    res.append(min_samples_gras)
-    res.append(min_samples_agr)
-    res.append(min_samples_water)
-    res.append(min_samles_savana)
-    res.append(min_samles_forest)#
 
-    try:
-        samples_classification = pd.concat(res)
-    except Exception as e:
-        return None
+    output_sp.append(samples_all.query('label == 33').sample(n=20))
+    output_sp.append(samples_all.query('label == 4').sample(n=20))
+    output_sp.append(samples_all.query('label == 12').sample(n=20))
+    output_sp.append(samples_all.query('label == 3').sample(n=20))
+    output_sp.append(samples_all.query('label == 15').sample(n=20))
+    output_sp.append(samples_all.query('label == 18').sample(n=20))
 
-    return samples_classification
+    df_output = pd.concat(output_sp)
+
+    print(df_output.head(30))
+
+    return df_output
+
+
+
+
+
+
 
 def get_features(tile, year):
 
@@ -462,25 +448,20 @@ def get_features(tile, year):
         .rename('transitions_year')
 
 
-
     #
     distinct_total = classification_tile\
         .reduce(ee.Reducer.countDistinctNonNull())\
         .rename('distinct_total')
     
-    distinct_year = classification_year\
-        .reduce(ee.Reducer.countDistinctNonNull())\
-        .rename('distinct_year')
-    
-
+    #distinct_year = classification_year\
+    #    .reduce(ee.Reducer.countDistinctNonNull())\
+    #    .rename('distinct_year')
     
     # mode
     mode_year = classification_year\
         .reduce(ee.Reducer.mode())\
         .rename('mode')
     
-
-
     forest_total = classification_tile\
         .map(lambda image: image.eq(3))\
         .reduce(ee.Reducer.sum())\
@@ -492,8 +473,6 @@ def get_features(tile, year):
         .reduce(ee.Reducer.sum())\
         .divide(n_observations_year)\
         .rename('occurrence_forest_year')
-
-
 
     # occurrence savanna 
     savanna_total = classification_tile\
@@ -507,7 +486,6 @@ def get_features(tile, year):
         .reduce(ee.Reducer.sum())\
         .divide(n_observations_year)\
         .rename('occurrence_savanna_year')
-    
 
 
     # occurrence grass 
@@ -524,8 +502,6 @@ def get_features(tile, year):
         .rename('occurrence_grassland_year')
 
 
-
-
     # occurrence pasture
     pasture_total = classification_tile\
         .map(lambda image: image.eq(15))\
@@ -538,8 +514,6 @@ def get_features(tile, year):
         .reduce(ee.Reducer.sum())\
         .divide(n_observations_year)\
         .rename('occurrence_pasture_year')
-
-
 
 
     # occurrence agriculture
@@ -572,12 +546,9 @@ def get_features(tile, year):
         .rename('occurrence_water_year')
     
 
-
-
     # image feature space
     image = mode_year\
         .addBands(transitions_year)\
-        .addBands(distinct_year)\
         .addBands(n_observations_year)\
         .addBands(forest_year)\
         .addBands(savanna_year)\
@@ -597,11 +568,14 @@ def get_features(tile, year):
 
     return image, roi
 
-def get_sample_values(samples, tiles, year):
+def get_sample_values(samples, tile, tiles, year):
 
     sample_vals = ee.FeatureCollection([])
 
+    # for t in tiles + [tile]:
     for t in tiles:
+
+        print(f'getting samples from tile {t}')
         
         image, _ = get_features(str(t), year)
 
@@ -617,29 +591,50 @@ def get_sample_values(samples, tiles, year):
     return sample_vals
 
 #@retry()
-def classify_data(tile, year):
-
-    df_samples = gpd.GeoDataFrame()
-
+def classify_data(tile, year, tiles_around):
+    '''
     try:
-        df_samples = gpd.read_file(f'{PATH_SAMPLES}/{year}/{tile}.geojson')
+        list_samples = []
+        for tile_around in tiles_around:
+            if os.path.exists(f'{PATH_SAMPLES}/{year}/{tile_around}.geojson'):
+                df_samples = gpd.read_file(f'{PATH_SAMPLES}/{year}/{tile_around}.geojson')\
+                    .drop(columns=["SCENE_CENTER_TIME"], errors="ignore")
+                list_samples.append(df_samples)
+        
     except Exception as e:
         print(f'erro no tile {e}')
         print('searching random samples')
-        pass
+        df_samples = None
+    '''
+    try:
+        df_samples = gpd.read_file(f'{PATH_SAMPLES}/{year}/{tile}.geojson')\
+            .drop(columns=["SCENE_CENTER_TIME"], errors="ignore")
+        
+    except Exception as e:
+        print(f'erro no tile {e}')
+        print('searching random samples')
+        df_samples = None
 
     samples_balanced = get_balanced_samples(
         balance=SAMPLE_PARAMS, 
-        samples=df_samples, list_samples_df=df_samples_amazon)
-    
+        samples=df_samples, 
+        samples_all=df_samples_amazon,
+        year_sample=year,
+        tile=tile
+    )
 
-    if samples_balanced is None: return None
 
-    samples_balanced = samples_balanced[['label', 'geometry', 'tile']]
+    # if samples_balanced is None: return None
+    if df_samples is None: return None
+
+    samples_balanced = samples_balanced[['year', 'label', 'geometry', 'tile']]
+
+    # samples_balanced = df_samples[['year', 'label', 'geometry', 'tile']]
+
+    print(samples_balanced.head(50))
 
     tiles_of_samples = samples_balanced['tile'].values.tolist()
-    tiles_of_samples = set(tiles_of_samples)
-
+    tiles_of_samples = list(set(tiles_of_samples))
 
 
     # convert to ee features
@@ -651,17 +646,13 @@ def classify_data(tile, year):
 
     image_fs, roi = get_features(tile, year)
 
-    sp = get_sample_values(samples, tiles_of_samples, year)
+    print('number tiles', len(tiles_of_samples))
 
-    # classify
-    # classifier_prob = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
-    #     .setOutputMode('MULTIPROBABILITY')\
-    #     .train(sp, 'label', FEATURE_SPACE)
+    sp = get_sample_values(samples, tile, tiles_of_samples, year)
 
     
     classifier = ee.Classifier.smileRandomForest(**MODEL_PARAMS)\
         .train(sp, 'label', FEATURE_SPACE)
-
 
 
     classification = ee.Image(image_fs
@@ -671,19 +662,6 @@ def classify_data(tile, year):
         .copyProperties(image_fs, ['system:footprint'])
         .copyProperties(image_fs, ['system:time_start'])
     )
-
-    #probabilities = ee.Image(image
-    #    .classify(classifier_prob)
-    #    .rename(['probability'])
-    #    .copyProperties(image)
-    #    .copyProperties(image, ['system:footprint'])
-    #    .copyProperties(image, ['system:time_start'])
-    #)
-    
-    #probabilities = probabilities\
-    #    .toArray().arrayArgmax()\
-    #    .arrayGet([0])
-
 
     #probabilities = ee.Image(probabilities).multiply(100).rename('probabilities')
 
@@ -729,6 +707,9 @@ def classify_data(tile, year):
 
 '''
 
+# add property
+#tiles = tiles.map(lambda image: add_tiles_around(image, tiles))
+
 for year in YEARS:
 
 
@@ -737,7 +718,7 @@ for year in YEARS:
         .reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
 
     tiles_list_loaded = ee.ImageCollection(ASSET_OUTPUT)\
-        .filter(f'version == "2" and year == {str(year)}')\
+        .filter(f'version == "{OUTPUT_VERSION}" and year == {str(year)}')\
         .reduceColumns(ee.Reducer.toList(), ['tile']).get('list').getInfo()
     
     tiles_list_target = set(tiles_list) - set(tiles_list_loaded)
@@ -745,7 +726,7 @@ for year in YEARS:
     file_samples = []
     for i in glob(f'{PATH_DIR}/data/{year}/*'):
         try:
-            file_samples.append(gpd.read_file(i)) 
+            file_samples.append(gpd.read_file(i).drop(columns=["SCENE_CENTER_TIME"], errors="ignore")) 
         except Exception as e: 
             print(e)
             continue
@@ -753,10 +734,10 @@ for year in YEARS:
     df_samples_amazon = pd.concat(file_samples)
 
     for tile in tiles_list_target:
-    
-        result = classify_data(tile, year)
+        
+        tiles_around = ee.Image(tiles.filter(f'tile == {tile}').first()).get('tiles_around')
 
-        print(result)
+        result = classify_data(tile, year, tiles_around)
 
         if result is None: 
             print('error - exporting ')

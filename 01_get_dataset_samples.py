@@ -95,8 +95,8 @@ YEARS = [
     # 2015, 2016, 
     # 2017, 2018, 
     # 2019, 2020,
-    # 2021, 2022, 2023, 
-    2024
+    2021, 2022, 2023, 
+    
 
 ]
 
@@ -223,12 +223,7 @@ p2 = ee.FeatureCollection(ASSET_SAMPLES_P2)\
     .filter('AMOSTRAS == "Treinamento"')
 
 
-samples = p1.merge(p1)
-
-
-print('ola')
-
-exit()
+samples = p1.merge(p2)
 
 
 
