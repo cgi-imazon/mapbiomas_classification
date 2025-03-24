@@ -405,16 +405,11 @@ def get_balanced_samples(balance: pd.DataFrame, samples: gpd.GeoDataFrame, sampl
 
 def get_features(tile, year):
 
-    tile_image = ee.Image(tiles.filter(f'tile == {tile}').first())
+    tile_image = ee.Image(tiles.filter(f'tile == {tile}').filter('version == 2').first())
 
     roi = tile_image.geometry()
 
     center = roi.centroid()
-
-    #classification_year = ee.ImageCollection(ASSET_CLASSIFICATION)\
-    #    .filter(f'version == "1" and year == {year}')\
-    #    .select(0)\
-    #    .filterBounds(center)
 
     classification_tile = get_classification(center).select(0)
 
@@ -564,7 +559,8 @@ def get_features(tile, year):
         .addBands(grassland_total)\
         .addBands(pasture_total)\
         .addBands(agriculture_total)\
-        .addBands(water_total)
+        .addBands(water_total)\
+        .mask(tile_image)
 
     return image, roi
 
@@ -591,7 +587,7 @@ def get_sample_values(samples, tile, tiles, year):
     return sample_vals
 
 #@retry()
-def classify_data(tile, year, tiles_around):
+def classify_data(tile, year):
     '''
     try:
         list_samples = []
@@ -735,9 +731,7 @@ for year in YEARS:
 
     for tile in tiles_list_target:
         
-        tiles_around = ee.Image(tiles.filter(f'tile == {tile}').first()).get('tiles_around')
-
-        result = classify_data(tile, year, tiles_around)
+        result = classify_data(tile, year)
 
         if result is None: 
             print('error - exporting ')
